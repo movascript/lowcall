@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import io, { Socket } from "socket.io-client";
 import "./App.css";
 
-const SIGNALING_SERVER = "http://localhost:3000";
+const SIGNALING_SERVER = "https://lowcall.ir";
 
 const iceServers: RTCConfiguration = {
   iceServers: [
