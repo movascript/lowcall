@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import io, { Socket } from "socket.io-client";
 import "./App.css";
 
-const SIGNALING_SERVER = "https://lowcall.ir";
+// const SIGNALING_SERVER = "https://lowcall.ir";
+const SIGNALING_SERVER = "localhost:3000";
 
 const iceServers: RTCConfiguration = {
   iceServers: [
@@ -11,8 +12,6 @@ const iceServers: RTCConfiguration = {
       username: "myuser",
       credential: "mypassword",
     },
-    // { urls: "stun:stun.l.google.com:19302" },
-    // { urls: "stun:stun1.l.google.com:19302" },
   ],
   iceCandidatePoolSize: 10,
 };
@@ -21,7 +20,11 @@ interface Stats {
   ping: number;
   bitrate: number;
   packetLoss: number;
-  connectionType: string;
+  protocol: string;
+  candidateType: string;
+  networkType: string;
+  localAddress: string;
+  remoteAddress: string;
 }
 
 function App() {
@@ -35,7 +38,11 @@ function App() {
     ping: 0,
     bitrate: 0,
     packetLoss: 0,
-    connectionType: "N/A",
+    protocol: "N/A",
+    candidateType: "N/A",
+    networkType: "N/A",
+    localAddress: "N/A",
+    remoteAddress: "N/A",
   });
 
   const socketRef = useRef<Socket | null>(null);
@@ -111,7 +118,6 @@ function App() {
       statsIntervalRef.current = null;
     }
 
-    // Recreate peer connection for potential reconnection
     if (joined && localStreamRef.current) {
       createPeerConnection();
       localStreamRef.current.getTracks().forEach((track) => {
@@ -289,7 +295,14 @@ function App() {
       let bitrate = 0;
       let packetLoss = 0;
       let rtt = 0;
-      let connectionType = "N/A";
+      let protocol = "N/A";
+      let candidateType = "N/A";
+      let networkType = "N/A";
+      let localAddress = "N/A";
+      let remoteAddress = "N/A";
+
+      let localCandidateId = "";
+      let remoteCandidateId = "";
 
       statsReport.forEach((report) => {
         if (report.type === "inbound-rtp" && report.mediaType === "video") {
@@ -304,29 +317,59 @@ function App() {
             );
           }
         }
+
         if (report.type === "candidate-pair" && report.state === "succeeded") {
           rtt = report.currentRoundTripTime
             ? Math.round(report.currentRoundTripTime * 1000)
             : 0;
-
-          // Get connection type (UDP/TCP)
-          const localCandidateId = report.localCandidateId;
-          const remoteCandidateId = report.remoteCandidateId;
-
-          statsReport.forEach((candidateReport) => {
-            if (
-              candidateReport.id === localCandidateId ||
-              candidateReport.id === remoteCandidateId
-            ) {
-              if (candidateReport.protocol) {
-                connectionType = candidateReport.protocol.toUpperCase();
-              }
-            }
-          });
+          localCandidateId = report.localCandidateId;
+          remoteCandidateId = report.remoteCandidateId;
         }
       });
 
-      setStats({ ping: rtt, bitrate, packetLoss, connectionType });
+      statsReport.forEach((report) => {
+        if (
+          report.type === "local-candidate" &&
+          report.id === localCandidateId
+        ) {
+          protocol = report.protocol?.toUpperCase() || "N/A";
+          candidateType = report.candidateType || "N/A";
+          networkType = report.networkType || "N/A";
+          localAddress = report.address
+            ? `${report.address}:${report.port}`
+            : "N/A";
+        }
+
+        if (
+          report.type === "remote-candidate" &&
+          report.id === remoteCandidateId
+        ) {
+          remoteAddress = report.address
+            ? `${report.address}:${report.port}`
+            : "N/A";
+        }
+      });
+
+      // Determine connection method
+      const connectionMethod =
+        candidateType === "relay"
+          ? "TURN"
+          : candidateType === "srflx"
+            ? "STUN"
+            : candidateType === "host"
+              ? "P2P"
+              : candidateType.toUpperCase();
+
+      setStats({
+        ping: rtt,
+        bitrate,
+        packetLoss,
+        protocol,
+        candidateType: connectionMethod,
+        networkType,
+        localAddress,
+        remoteAddress,
+      });
     }, 1000) as unknown as number;
   };
 
@@ -355,22 +398,13 @@ function App() {
   };
 
   const leaveCall = () => {
-    // Notify server before leaving
     socketRef.current?.emit("leave-room", currentRoomRef.current);
-
-    // Clean up everything
     cleanup();
-
-    // Reset state
     setJoined(false);
     setConnected(false);
     setRoomId("");
     currentRoomRef.current = "";
-
-    // Reinitialize socket connection
     socketRef.current = io(SIGNALING_SERVER);
-
-    // Re-setup socket listeners
     setupSocketListeners();
   };
 
@@ -446,6 +480,13 @@ function App() {
       console.log("User disconnected");
       handleRemoteDisconnect();
     });
+  };
+
+  const getConnectionColor = () => {
+    if (stats.candidateType === "P2P") return "#10b981";
+    if (stats.candidateType === "STUN") return "#3b82f6";
+    if (stats.candidateType === "TURN") return "#f59e0b";
+    return "#6b7280";
   };
 
   return (
@@ -597,51 +638,48 @@ function App() {
           </div>
 
           {connected && (
-            <div className="stats-bar">
-              <span className="stat-item">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <circle cx="12" cy="12" r="2" />
-                </svg>
-                {stats.ping}ms
-              </span>
-              <span className="stat-item">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-                {stats.bitrate} kbps
-              </span>
-              <span className="stat-item">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
-                </svg>
-                {stats.packetLoss}%
-              </span>
-              <span className="stat-item">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                </svg>
-                {stats.connectionType}
-              </span>
+            <div className="stats-container">
+              <div className="stats-row">
+                <div className="stat-card">
+                  <div className="stat-label">Connection</div>
+                  <div
+                    className="stat-value"
+                    style={{ color: getConnectionColor() }}
+                  >
+                    {stats.candidateType}
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Protocol</div>
+                  <div className="stat-value">{stats.protocol}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Latency</div>
+                  <div className="stat-value">{stats.ping}ms</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Bitrate</div>
+                  <div className="stat-value">{stats.bitrate} kbps</div>
+                </div>
+              </div>
+              <div className="stats-row">
+                <div className="stat-card">
+                  <div className="stat-label">Packet Loss</div>
+                  <div className="stat-value">{stats.packetLoss}%</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Network</div>
+                  <div className="stat-value">{stats.networkType}</div>
+                </div>
+                <div className="stat-card wide">
+                  <div className="stat-label">Local</div>
+                  <div className="stat-value small">{stats.localAddress}</div>
+                </div>
+                <div className="stat-card wide">
+                  <div className="stat-label">Remote</div>
+                  <div className="stat-value small">{stats.remoteAddress}</div>
+                </div>
+              </div>
             </div>
           )}
         </div>
