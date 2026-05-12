@@ -2,18 +2,32 @@ import { useEffect, useRef, useState } from "react";
 import io, { Socket } from "socket.io-client";
 import "./App.css";
 
-// const SIGNALING_SERVER = "https://lowcall.ir";
-const SIGNALING_SERVER = "localhost:3000";
+const SIGNALING_SERVER = "https://lowcall.ir";
 
 const iceServers: RTCConfiguration = {
   iceServers: [
+    { urls: "stun:lowcall.ir:3478" },
+    { urls: "stun:193.176.242.86:3478" },
     {
-      urls: ["stun:lowcall.ir:3478", "turn:lowcall.ir:3478"],
+      urls: "turn:lowcall.ir:3478?transport=udp",
+      username: "myuser",
+      credential: "mypassword",
+    },
+    {
+      urls: "turn:lowcall.ir:3478?transport=tcp",
+      username: "myuser",
+      credential: "mypassword",
+    },
+    {
+      urls: "turns:lowcall.ir:5349?transport=tcp",
       username: "myuser",
       credential: "mypassword",
     },
   ],
-  iceCandidatePoolSize: 10,
+  iceCandidatePoolSize: 1,
+  bundlePolicy: "max-bundle",
+  iceTransportPolicy: "all",
+  rtcpMuxPolicy: "require",
 };
 
 interface Stats {
@@ -248,14 +262,15 @@ function App() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 },
+          width: { ideal: 1280, max: 1280 },
+          height: { ideal: 720, max: 720 },
+          frameRate: { ideal: 30, max: 30 },
         },
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          sampleRate: 48000,
         },
       });
 

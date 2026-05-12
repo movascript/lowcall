@@ -7,6 +7,7 @@ const server = http.createServer(app);
 const io = socketIO(server, {
   cors: {
     origin: "*",
+    // origin: "lowcall.ir",
     methods: ["GET", "POST"],
   },
 });
