@@ -7,12 +7,11 @@ const server = http.createServer(app);
 const io = socketIO(server, {
   cors: {
     origin: "*",
-    // origin: "lowcall.ir",
     methods: ["GET", "POST"],
   },
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 const rooms = new Map();
 
@@ -20,20 +19,28 @@ io.on("connection", (socket) => {
   console.log("New user connected:", socket.id);
 
   socket.on("join-room", (roomId) => {
-    socket.join(roomId);
-
     if (!rooms.has(roomId)) {
       rooms.set(roomId, new Set());
     }
-    rooms.get(roomId).add(socket.id);
 
-    const roomSize = rooms.get(roomId).size;
-    console.log(`${socket.id} joined room ${roomId} (count: ${roomSize})`);
+    const room = rooms.get(roomId);
 
-    if (roomSize === 2) {
-      const usersInRoom = Array.from(rooms.get(roomId));
+    // Allow up to 2 users per room
+    if (room.size >= 2) {
+      socket.emit("room-full");
+      return;
+    }
+
+    socket.join(roomId);
+    room.add(socket.id);
+
+    console.log(`${socket.id} joined room ${roomId} (count: ${room.size})`);
+
+    // Only notify ready if exactly 2 users are present
+    if (room.size === 2) {
+      const usersInRoom = Array.from(room);
       const firstUser = usersInRoom[0];
-      console.log(`Sending 'ready' to first user: ${firstUser}`);
+      // Send ready event to initiate the offer
       io.to(firstUser).emit("ready");
     }
   });
@@ -68,8 +75,10 @@ io.on("connection", (socket) => {
     rooms.forEach((users, roomId) => {
       if (users.has(socketId)) {
         users.delete(socketId);
-        socket.to(roomId).emit("user-disconnected");
+        // Let the remaining peer know
+        io.to(roomId).emit("user-disconnected");
 
+        // Clean up empty rooms
         if (users.size === 0) {
           rooms.delete(roomId);
         }
