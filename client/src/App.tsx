@@ -136,10 +136,12 @@ function App() {
             />
 
             {!connected && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-linear-to-br from-gray-900 to-black text-white z-10">
-                <Loader2 className="w-12 h-12 animate-spin mb-4 text-primary" />
-                <p className="text-lg font-medium">Connecting...</p>
-                <p className="text-sm text-white/60 mt-2">Room: {roomId}</p>
+              <div className="absolute inset-0 flex justify-center bg-linear-to-br from-gray-900 to-black text-white z-10">
+                <div className="flex gap-2 h-0 items-center justify-center mt-10">
+                  <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                  <p className="text-lg font-medium">Connecting...</p>
+                  <p className="text-sm text-white/60">Room: {roomId}</p>
+                </div>
               </div>
             )}
 

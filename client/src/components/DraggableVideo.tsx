@@ -121,7 +121,7 @@ export function DraggableVideo({
         "absolute rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 ease-out z-20",
         connected
           ? "w-48 h-36 cursor-move"
-          : "w-[70%] max-w-sm aspect-video top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2",
+          : "w-[90%] max-w-xl aspect-video top-[50%] left-1/2 -translate-x-1/2 -translate-y-1/2",
         isDragging && "cursor-grabbing scale-105 transition-none",
       )}
       style={
