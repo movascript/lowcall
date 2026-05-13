@@ -16,8 +16,7 @@ export const iceServers: RTCConfiguration = {
       credential: "mypassword",
     },
   ],
-  iceCandidatePoolSize: 1,
-  bundlePolicy: "max-bundle",
+  iceCandidatePoolSize: 2,
+  bundlePolicy: "max-compat",
   iceTransportPolicy: "all",
-  rtcpMuxPolicy: "require",
 };
