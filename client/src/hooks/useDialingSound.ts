@@ -14,10 +14,11 @@ export const useDialingSound = (joined: boolean, connected: boolean) => {
 
     ringAudioRef.current = new Audio("/ring.mp3");
     ringAudioRef.current.loop = true;
-    ringAudioRef.current.volume = 0.5;
+    ringAudioRef.current.volume = 0.03;
     ringAudioRef.current.preload = "auto";
 
     connectAudioRef.current = new Audio("/connected.mp3");
+    connectAudioRef.current.volume = 0.3;
     connectAudioRef.current.preload = "auto";
 
     return () => {
