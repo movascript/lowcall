@@ -22,8 +22,8 @@ export function ConnectionStats({
     return "#6b7280";
   };
   const getProtocolColor = () => {
-    if (stats.candidateType === "UDP") return "#10b981";
-    if (stats.candidateType === "TCP") return "#3b82f6";
+    if (stats.protocol === "UDP") return "#6f9eff";
+    if (stats.protocol === "TCP") return "#a1ae5f";
     return "#6b7280";
   };
 
@@ -38,7 +38,7 @@ export function ConnectionStats({
           <Activity size={20} />
         </button>
       ) : (
-        <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-xl p-2 w-80 shadow-2xl animate-in fade-in slide-in-from-top-4">
+        <div className="bg-black/50 backdrop-blur-md border border-white/10 rounded-xl p-2 w-80 shadow-2xl animate-in fade-in slide-in-from-top-4">
           <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-3">
             <span className="text-white px-2 font-medium text-sm flex items-center gap-2">
               <Activity size={16} /> Connection Info

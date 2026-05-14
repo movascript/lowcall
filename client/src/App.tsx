@@ -65,7 +65,7 @@ function App() {
   }, [speakerMode]);
 
   const handleJoinRoom = async () => {
-    if (!roomId.trim()) return;
+    if (!roomId.toLowerCase().trim()) return;
     try {
       await joinRoom(roomId);
       setJoined(true);

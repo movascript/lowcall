@@ -213,7 +213,7 @@ export const useWebRTC = (
           remoteCandidateId = "";
 
         statsReport.forEach((report) => {
-          if (report.type === "inbound-rtp" && report.mediaType === "video") {
+          if (report.type === "inbound-rtp") {
             if (report.bytesReceived) bytesReceived += report.bytesReceived;
             if (report.packetsLost && report.packetsReceived) {
               packetLoss = Math.round(
@@ -223,7 +223,7 @@ export const useWebRTC = (
               );
             }
           }
-          if (report.type === "outbound-rtp" && report.mediaType === "video") {
+          if (report.type === "outbound-rtp") {
             if (report.bytesSent) bytesSent += report.bytesSent;
           }
           if (
