@@ -21,6 +21,11 @@ export function ConnectionStats({
     if (stats.candidateType === "TURN") return "#f59e0b";
     return "#6b7280";
   };
+  const getProtocolColor = () => {
+    if (stats.candidateType === "UDP") return "#10b981";
+    if (stats.candidateType === "TCP") return "#3b82f6";
+    return "#6b7280";
+  };
 
   return (
     <div className="absolute top-5 left-5 z-30">
@@ -47,26 +52,41 @@ export function ConnectionStats({
           </div>
           <div className="grid grid-cols-2 p-2 pt-0 gap-2">
             <StatItem
-              label="Status - Protocol"
-              value={`${stats.candidateType} - ${stats.protocol}`}
+              label="Status"
+              value={stats.candidateType}
               color={getConnectionColor()}
             />
-            <StatItem label="Latency" value={`${stats.ping}ms`} />
-            <StatItem label="Bitrate" value={`${stats.bitrate} kbps`} />
-
-            <StatItem label="Packet Loss" value={`${stats.packetLoss}%`} />
-            <StatItem label="SENT" value={formatBytes(stats.totalBytesSent)} />
             <StatItem
-              label="RECEIVED"
-              value={formatBytes(stats.totalBytesReceived)}
+              label="Protocol"
+              value={stats.protocol}
+              color={getProtocolColor()}
+            />
+
+            <StatItem label="Latency" value={`${stats.ping}ms`} />
+            <StatItem label="Packet Loss" value={`${stats.packetLoss}%`} />
+
+            <StatItem
+              label="Send Bitrate"
+              value={`${formatBytes(stats.bitrateSent)}/s`}
             />
             <StatItem
-              label="LOCAL"
+              label="Reveive Bitrate"
+              value={`${formatBytes(stats.bitrateReceived)}/s`}
+            />
+
+            <StatItem label="Sent" value={formatBytes(stats.totalBytesSent)} />
+            <StatItem
+              label="Received"
+              value={formatBytes(stats.totalBytesReceived)}
+            />
+
+            <StatItem
+              label="Local"
               value={stats.localAddress}
               valueClassName="text-xs py-0.5"
             />
             <StatItem
-              label="REMOTE"
+              label="Remote"
               value={stats.remoteAddress}
               valueClassName="text-xs py-0.5"
             />

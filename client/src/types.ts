@@ -1,6 +1,7 @@
 export interface ConnectionStatus {
   ping: number;
-  bitrate: number;
+  bitrateReceived: number;
+  bitrateSent: number;
   packetLoss: number;
   protocol: string;
   candidateType: string;

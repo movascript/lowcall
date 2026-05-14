@@ -4,7 +4,8 @@ import type { ConnectionStatus } from "../types";
 
 const initialStats: ConnectionStatus = {
   ping: 0,
-  bitrate: 0,
+  bitrateReceived: 0,
+  bitrateSent: 0,
   packetLoss: 0,
   protocol: "N/A",
   candidateType: "N/A",
@@ -213,7 +214,7 @@ export const useWebRTC = (
 
         statsReport.forEach((report) => {
           if (report.type === "inbound-rtp" && report.mediaType === "video") {
-            if (report.bytesReceived) bytesReceived = report.bytesReceived;
+            if (report.bytesReceived) bytesReceived += report.bytesReceived;
             if (report.packetsLost && report.packetsReceived) {
               packetLoss = Math.round(
                 (report.packetsLost /
@@ -223,7 +224,7 @@ export const useWebRTC = (
             }
           }
           if (report.type === "outbound-rtp" && report.mediaType === "video") {
-            if (report.bytesSent) bytesSent = report.bytesSent;
+            if (report.bytesSent) bytesSent += report.bytesSent;
           }
           if (
             report.type === "candidate-pair" &&
@@ -261,14 +262,14 @@ export const useWebRTC = (
 
         const now = Date.now();
         const dt = (now - prevTimeRef.current) / 1000;
-        const bitrate =
+
+        const bitrateReceived =
           dt > 0
-            ? Math.round(
-                ((bytesReceived - prevBytesReceivedRef.current) * 8) /
-                  1000 /
-                  dt,
-              )
+            ? Math.round((bytesReceived - prevBytesReceivedRef.current) / dt)
             : 0;
+
+        const bitrateSent =
+          dt > 0 ? Math.round((bytesSent - prevBytesSentRef.current) / dt) : 0;
 
         prevBytesReceivedRef.current = bytesReceived;
         prevBytesSentRef.current = bytesSent;
@@ -286,7 +287,8 @@ export const useWebRTC = (
         if (mountedRef.current) {
           setStats({
             ping: rtt,
-            bitrate,
+            bitrateReceived,
+            bitrateSent,
             packetLoss,
             protocol,
             candidateType: connectionMethod,
