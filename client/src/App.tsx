@@ -10,7 +10,8 @@ import { ConnectionStats } from "./components/ConnectionStats";
 import { cn } from "./utils/classname";
 import { useDialingSound } from "./hooks/useDialingSound";
 import ControlBar from "./components/ControlBar";
-import LandingPage from "./components/landingPage";
+import LandingPage from "./components/LandingPage";
+import { usePreventRefresh } from "./hooks/usePreventRefresh";
 
 function App() {
   const [roomId, setRoomId] = useState("");
@@ -33,6 +34,9 @@ function App() {
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Prevent accidental refresh/close when in call
+  usePreventRefresh(joined && connected);
 
   useEffect(() => {
     if (localStream && localVideoRef.current) {
