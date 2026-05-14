@@ -18,6 +18,7 @@ import { DraggableVideo } from "./components/DraggableVideo";
 import { ConnectionStats } from "./components/ConnectionStats";
 import { ControlButton } from "./components/ControlButton";
 import { cn } from "./utils/classname";
+import { useDialingSound } from "./hooks/useDialingSound";
 
 function App() {
   const [roomId, setRoomId] = useState("");
@@ -26,6 +27,8 @@ function App() {
 
   const { connected, stats, localStream, remoteStream, joinRoom, leaveRoom } =
     useWebRTC(signalingServer, iceServers);
+
+  useDialingSound(joined, connected);
 
   const {
     audioEnabled,
