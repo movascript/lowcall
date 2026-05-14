@@ -64,11 +64,14 @@ io.on("connection", (socket) => {
     console.log("User leaving room:", socket.id, roomId);
     socket.to(roomId).emit("user-disconnected");
     handleDisconnect(socket.id);
+    socket.handled = true;
   });
 
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
-    handleDisconnect(socket.id);
+    if (!socket.handled) {
+      handleDisconnect(socket.id);
+    }
   });
 
   function handleDisconnect(socketId) {

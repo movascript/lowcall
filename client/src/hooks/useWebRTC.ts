@@ -1,18 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import io, { Socket } from "socket.io-client";
+import type { ConnectionStatus } from "../types";
 
-export interface Stats {
-  ping: number;
-  bitrate: number;
-  packetLoss: number;
-  protocol: string;
-  candidateType: string;
-  networkType: string;
-  localAddress: string;
-  remoteAddress: string;
-}
-
-const initialStats: Stats = {
+const initialStats: ConnectionStatus = {
   ping: 0,
   bitrate: 0,
   packetLoss: 0,
@@ -21,6 +11,8 @@ const initialStats: Stats = {
   networkType: "N/A",
   localAddress: "N/A",
   remoteAddress: "N/A",
+  totalBytesReceived: 0,
+  totalBytesSent: 0,
 };
 
 export const useWebRTC = (
@@ -30,14 +22,30 @@ export const useWebRTC = (
   const [connected, setConnected] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [stats, setStats] = useState<Stats>(initialStats);
+  const [stats, setStats] = useState<ConnectionStatus>(initialStats);
 
   const socketRef = useRef<Socket | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const statsIntervalRef = useRef<number | null>(null);
-  const currentRoomRef = useRef<string>("");
+  const currentRoomRef = useRef("");
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const mountedRef = useRef(true);
+  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const prevBytesReceivedRef = useRef(0);
+  const prevBytesSentRef = useRef(0);
+  const prevTimeRef = useRef(Date.now());
 
-  // Single source of truth for socket initialization
+  useEffect(() => {
+    localStreamRef.current = localStream;
+  }, [localStream]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     socketRef.current = io(signalingServer);
 
@@ -64,6 +72,7 @@ export const useWebRTC = (
           pc = createPeerConnection();
         }
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        flushPendingCandidates();
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         socket.emit("answer", { roomId: currentRoomRef.current, answer });
@@ -76,15 +85,17 @@ export const useWebRTC = (
       const pc = peerConnectionRef.current;
       if (pc && pc.signalingState !== "stable") {
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        flushPendingCandidates();
       }
     });
 
     socket.on("ice-candidate", async (candidate: RTCIceCandidateInit) => {
       try {
-        if (peerConnectionRef.current) {
-          await peerConnectionRef.current.addIceCandidate(
-            new RTCIceCandidate(candidate),
-          );
+        const pc = peerConnectionRef.current;
+        if (pc && pc.remoteDescription) {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } else {
+          pendingCandidatesRef.current.push(candidate);
         }
       } catch (e) {
         console.error("ICE error:", e);
@@ -92,16 +103,18 @@ export const useWebRTC = (
     });
 
     socket.on("user-disconnected", () => {
-      setConnected(false);
-      setRemoteStream(null);
-      setStats(initialStats);
+      if (mountedRef.current) {
+        setConnected(false);
+        setRemoteStream(null);
+        setStats(initialStats);
+      }
       stopStatsMonitoring();
       // Recreate peer connection for potential reconnect
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
         peerConnectionRef.current = null;
       }
-      if (currentRoomRef.current) {
+      if (currentRoomRef.current && localStreamRef.current) {
         createPeerConnection();
       }
     });
@@ -110,9 +123,22 @@ export const useWebRTC = (
       socket.disconnect();
       cleanupAll();
     };
-  }, [signalingServer]); // Only recreate socket if server changes
+  }, [signalingServer]);
 
-  // Peer connection factory - not a callback, just a function
+  function flushPendingCandidates() {
+    const pc = peerConnectionRef.current;
+    if (!pc || !pc.remoteDescription) return;
+
+    pendingCandidatesRef.current.forEach(async (candidate) => {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) {
+        console.error("Queued ICE error:", e);
+      }
+    });
+    pendingCandidatesRef.current = [];
+  }
+
   function createPeerConnection(): RTCPeerConnection {
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
@@ -131,28 +157,29 @@ export const useWebRTC = (
     };
 
     pc.ontrack = (event) => {
-      setRemoteStream((prevStream) => {
-        const stream = prevStream || new MediaStream();
-        if (!stream.getTracks().includes(event.track)) {
-          stream.addTrack(event.track);
+      setRemoteStream((prev) => {
+        const next = new MediaStream(prev ? prev.getTracks() : []);
+        if (!next.getTracks().find((t) => t.id === event.track.id)) {
+          next.addTrack(event.track);
         }
-        return stream;
+        return next;
       });
-      setConnected(true);
+      if (mountedRef.current) setConnected(true);
       startStatsMonitoring();
     };
 
     pc.onconnectionstatechange = () => {
       if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
-        setConnected(false);
-        setRemoteStream(null);
-        setStats(initialStats);
+        if (mountedRef.current) {
+          setConnected(false);
+          setRemoteStream(null);
+          setStats(initialStats);
+        }
         stopStatsMonitoring();
       }
     };
 
-    // Add local tracks if available
-    const stream = localStream;
+    const stream = localStreamRef.current;
     if (stream) {
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
     }
@@ -161,7 +188,10 @@ export const useWebRTC = (
   }
 
   function startStatsMonitoring() {
-    if (statsIntervalRef.current) return; // Already running
+    stopStatsMonitoring();
+    prevBytesReceivedRef.current = 0;
+    prevBytesSentRef.current = 0;
+    prevTimeRef.current = Date.now();
 
     statsIntervalRef.current = setInterval(async () => {
       const pc = peerConnectionRef.current;
@@ -169,21 +199,21 @@ export const useWebRTC = (
 
       try {
         const statsReport = await pc.getStats();
-        let bitrate = 0,
+        let bytesReceived = 0,
+          bytesSent = 0,
           packetLoss = 0,
-          rtt = 0;
-        let protocol = "N/A",
+          rtt = 0,
+          protocol = "N/A",
           candidateType = "N/A",
-          networkType = "N/A";
-        let localAddress = "N/A",
-          remoteAddress = "N/A";
-        let localCandidateId = "",
+          networkType = "N/A",
+          localAddress = "N/A",
+          remoteAddress = "N/A",
+          localCandidateId = "",
           remoteCandidateId = "";
 
         statsReport.forEach((report) => {
           if (report.type === "inbound-rtp" && report.mediaType === "video") {
-            if (report.bytesReceived)
-              bitrate = Math.round((report.bytesReceived * 8) / 1000);
+            if (report.bytesReceived) bytesReceived = report.bytesReceived;
             if (report.packetsLost && report.packetsReceived) {
               packetLoss = Math.round(
                 (report.packetsLost /
@@ -191,6 +221,9 @@ export const useWebRTC = (
                   100,
               );
             }
+          }
+          if (report.type === "outbound-rtp" && report.mediaType === "video") {
+            if (report.bytesSent) bytesSent = report.bytesSent;
           }
           if (
             report.type === "candidate-pair" &&
@@ -226,6 +259,21 @@ export const useWebRTC = (
           }
         });
 
+        const now = Date.now();
+        const dt = (now - prevTimeRef.current) / 1000;
+        const bitrate =
+          dt > 0
+            ? Math.round(
+                ((bytesReceived - prevBytesReceivedRef.current) * 8) /
+                  1000 /
+                  dt,
+              )
+            : 0;
+
+        prevBytesReceivedRef.current = bytesReceived;
+        prevBytesSentRef.current = bytesSent;
+        prevTimeRef.current = now;
+
         const connectionMethod =
           candidateType === "relay"
             ? "TURN"
@@ -235,16 +283,20 @@ export const useWebRTC = (
                 ? "P2P"
                 : candidateType.toUpperCase();
 
-        setStats({
-          ping: rtt,
-          bitrate,
-          packetLoss,
-          protocol,
-          candidateType: connectionMethod,
-          networkType,
-          localAddress,
-          remoteAddress,
-        });
+        if (mountedRef.current) {
+          setStats({
+            ping: rtt,
+            bitrate,
+            packetLoss,
+            protocol,
+            candidateType: connectionMethod,
+            networkType,
+            localAddress,
+            remoteAddress,
+            totalBytesReceived: bytesReceived,
+            totalBytesSent: bytesSent,
+          });
+        }
       } catch (err) {
         console.error("Stats error:", err);
       }
@@ -263,17 +315,20 @@ export const useWebRTC = (
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
-    if (localStream) {
-      localStream.getTracks().forEach((track) => track.stop());
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
     }
     stopStatsMonitoring();
-    setLocalStream(null);
-    setConnected(false);
-    setRemoteStream(null);
-    setStats(initialStats);
+    if (mountedRef.current) {
+      setLocalStream(null);
+      setConnected(false);
+      setRemoteStream(null);
+      setStats(initialStats);
+    }
+    localStreamRef.current = null;
   }
 
-  // Create peer connection when local stream is ready
   useEffect(() => {
     if (localStream && currentRoomRef.current && !peerConnectionRef.current) {
       createPeerConnection();
@@ -295,10 +350,9 @@ export const useWebRTC = (
         },
       });
 
-      setLocalStream(stream);
+      localStreamRef.current = stream;
       currentRoomRef.current = roomId;
-
-      // Socket is already initialized in the effect
+      setLocalStream(stream);
       socketRef.current?.emit("join-room", roomId);
       return stream;
     } catch (error) {

@@ -17,6 +17,6 @@ export const iceServers: RTCConfiguration = {
     },
   ],
   iceCandidatePoolSize: 2,
-  bundlePolicy: "max-compat",
+  bundlePolicy: "max-bundle",
   iceTransportPolicy: "all",
 };
