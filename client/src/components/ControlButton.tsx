@@ -9,6 +9,7 @@ interface ControlButtonProps {
   active?: boolean;
   variant?: "default" | "danger" | "primary";
   size?: "md" | "lg";
+  disabled?: boolean;
 }
 
 export function ControlButton({
@@ -18,6 +19,7 @@ export function ControlButton({
   active = true,
   variant = "default",
   size = "md",
+  disabled,
 }: ControlButtonProps) {
   return (
     <button
@@ -36,6 +38,7 @@ export function ControlButton({
             : "bg-white/20 hover:bg-white/30"),
         variant === "danger" && "bg-destructive/90 hover:bg-destructive",
       )}
+      disabled={disabled}
     >
       <Icon size={24} className={iconClassname} />
     </button>

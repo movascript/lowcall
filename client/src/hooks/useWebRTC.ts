@@ -24,6 +24,8 @@ export const useWebRTC = (
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [stats, setStats] = useState<ConnectionStatus>(initialStats);
+  const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(true);
+  const [remoteVideoEnabled, setRemoteVideoEnabled] = useState(true);
 
   const socketRef = useRef<Socket | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -52,7 +54,22 @@ export const useWebRTC = (
 
     const socket = socketRef.current;
 
-    // All socket listeners in one place
+    // Room full handler
+    socket.on("room-full", () => {
+      alert("Room is full. Maximum 2 users allowed.");
+      cleanupAll();
+      window.location.reload();
+    });
+
+    // Remote mute state handlers
+    socket.on("peer-audio-toggle", (enabled: boolean) => {
+      setRemoteAudioEnabled(enabled);
+    });
+
+    socket.on("peer-video-toggle", (enabled: boolean) => {
+      setRemoteVideoEnabled(enabled);
+    });
+
     socket.on("ready", async () => {
       const pc = peerConnectionRef.current;
       if (!pc) return;
@@ -108,9 +125,10 @@ export const useWebRTC = (
         setConnected(false);
         setRemoteStream(null);
         setStats(initialStats);
+        setRemoteAudioEnabled(true);
+        setRemoteVideoEnabled(true);
       }
       stopStatsMonitoring();
-      // Recreate peer connection for potential reconnect
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
         peerConnectionRef.current = null;
@@ -175,6 +193,8 @@ export const useWebRTC = (
           setConnected(false);
           setRemoteStream(null);
           setStats(initialStats);
+          setRemoteAudioEnabled(true);
+          setRemoteVideoEnabled(true);
         }
         stopStatsMonitoring();
       }
@@ -327,6 +347,8 @@ export const useWebRTC = (
       setConnected(false);
       setRemoteStream(null);
       setStats(initialStats);
+      setRemoteAudioEnabled(true);
+      setRemoteVideoEnabled(true);
     }
     localStreamRef.current = null;
   }
@@ -343,7 +365,7 @@ export const useWebRTC = (
         video: {
           width: { ideal: 1280 },
           height: { ideal: 720 },
-          frameRate: { ideal: 30 },
+          frameRate: { ideal: 24 },
         },
         audio: {
           echoCancellation: true,
@@ -371,5 +393,34 @@ export const useWebRTC = (
     currentRoomRef.current = "";
   };
 
-  return { connected, stats, localStream, remoteStream, joinRoom, leaveRoom };
+  const notifyPeerAudioToggle = (enabled: boolean) => {
+    if (socketRef.current && currentRoomRef.current) {
+      socketRef.current.emit("audio-toggle", {
+        roomId: currentRoomRef.current,
+        enabled,
+      });
+    }
+  };
+
+  const notifyPeerVideoToggle = (enabled: boolean) => {
+    if (socketRef.current && currentRoomRef.current) {
+      socketRef.current.emit("video-toggle", {
+        roomId: currentRoomRef.current,
+        enabled,
+      });
+    }
+  };
+
+  return {
+    connected,
+    stats,
+    localStream,
+    remoteStream,
+    remoteAudioEnabled,
+    remoteVideoEnabled,
+    joinRoom,
+    leaveRoom,
+    notifyPeerAudioToggle,
+    notifyPeerVideoToggle,
+  };
 };

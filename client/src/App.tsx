@@ -4,7 +4,7 @@ import "./App.css";
 import { useWebRTC } from "./hooks/useWebRTC";
 import { useMediaControls } from "./hooks/useMediaControls";
 import { iceServers, signalingServer } from "./utils/constants";
-import { Loader2 } from "lucide-react";
+import { Loader2, MicOff, VideoOff } from "lucide-react";
 import { DraggableVideo } from "./components/DraggableVideo";
 import { ConnectionStats } from "./components/ConnectionStats";
 import { cn } from "./utils/classname";
@@ -18,24 +18,39 @@ function App() {
   const [joined, setJoined] = useState(false);
   const [showStats, setShowStats] = useState(false);
 
-  const { connected, stats, localStream, remoteStream, joinRoom, leaveRoom } =
-    useWebRTC(signalingServer, iceServers);
+  const {
+    connected,
+    stats,
+    localStream,
+    remoteStream,
+    remoteAudioEnabled,
+    remoteVideoEnabled,
+    joinRoom,
+    leaveRoom,
+    notifyPeerAudioToggle,
+    notifyPeerVideoToggle,
+  } = useWebRTC(signalingServer, iceServers);
+
+  console.log("au", remoteAudioEnabled, remoteVideoEnabled);
 
   useDialingSound(joined, connected);
 
   const {
     audioEnabled,
     videoEnabled,
-    speakerMode,
+    canSwitchCamera,
     toggleAudio,
     toggleVideo,
-    toggleSpeaker,
-  } = useMediaControls(localStream);
+    switchCamera,
+  } = useMediaControls(
+    localStream,
+    notifyPeerAudioToggle,
+    notifyPeerVideoToggle,
+  );
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Prevent accidental refresh/close when in call
   usePreventRefresh(joined && connected);
 
   useEffect(() => {
@@ -49,19 +64,6 @@ function App() {
       remoteVideoRef.current.srcObject = remoteStream || null;
     }
   }, [remoteStream]);
-
-  useEffect(() => {
-    if (
-      remoteVideoRef.current?.srcObject &&
-      "setSinkId" in remoteVideoRef.current
-    ) {
-      remoteVideoRef.current
-        .setSinkId(speakerMode ? "default" : "")
-        .catch((err: Error) => {
-          console.error("Error setting audio output:", err);
-        });
-    }
-  }, [speakerMode]);
 
   const handleJoinRoom = async () => {
     if (!roomId.toLowerCase().trim()) return;
@@ -102,6 +104,24 @@ function App() {
               )}
             />
 
+            {/* Remote user mute indicators */}
+            {connected && (
+              <div className="absolute top-4 left-4 flex gap-2 z-20">
+                {!remoteAudioEnabled && (
+                  <div className="bg-red-500/90 text-white px-3 py-2 rounded-lg flex items-center gap-2">
+                    <MicOff className="w-4 h-4" />
+                    <span className="text-sm font-medium">Muted</span>
+                  </div>
+                )}
+                {!remoteVideoEnabled && (
+                  <div className="bg-red-500/90 text-white px-3 py-2 rounded-lg flex items-center gap-2">
+                    <VideoOff className="w-4 h-4" />
+                    <span className="text-sm font-medium">Camera Off</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {!connected && (
               <div className="absolute inset-0 flex justify-center bg-linear-to-br from-gray-900 to-black text-white z-10">
                 <div className="flex gap-2 h-0 items-center justify-center mt-10">
@@ -130,10 +150,10 @@ function App() {
           <ControlBar
             audioEnabled={audioEnabled}
             videoEnabled={videoEnabled}
-            speakerMode={speakerMode}
+            canSwitchCamera={canSwitchCamera}
             toggleAudio={toggleAudio}
             toggleVideo={toggleVideo}
-            toggleSpeaker={toggleSpeaker}
+            switchCamera={switchCamera}
             handleLeaveCall={handleLeaveCall}
           />
         </div>

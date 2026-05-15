@@ -4,28 +4,27 @@ import {
   MicOff,
   Video,
   VideoOff,
-  Volume2,
-  VolumeX,
   Phone,
+  SwitchCamera,
 } from "lucide-react";
 
 interface ControlBarProps {
   audioEnabled: boolean;
   videoEnabled: boolean;
-  speakerMode: boolean;
+  canSwitchCamera: boolean;
   toggleAudio: () => void;
   toggleVideo: () => void;
-  toggleSpeaker: () => void;
+  switchCamera: () => void;
   handleLeaveCall: () => void;
 }
 
 const ControlBar = ({
   audioEnabled,
   videoEnabled,
-  speakerMode,
+  canSwitchCamera,
   toggleAudio,
   toggleVideo,
-  toggleSpeaker,
+  switchCamera,
   handleLeaveCall,
 }: ControlBarProps) => {
   return (
@@ -41,10 +40,11 @@ const ControlBar = ({
         active={videoEnabled}
       />
       <ControlButton
-        icon={speakerMode ? Volume2 : VolumeX}
-        onClick={toggleSpeaker}
-        active={speakerMode}
+        icon={SwitchCamera}
+        onClick={switchCamera}
+        active={false}
         variant="primary"
+        disabled={!canSwitchCamera}
       />
       <ControlButton
         icon={Phone}
