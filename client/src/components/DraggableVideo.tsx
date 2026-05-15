@@ -1,6 +1,6 @@
 // src/components/DraggableVideo.tsx
 import { useEffect, useRef, useState } from "react";
-import { UserCircle } from "lucide-react";
+import { CameraOff } from "lucide-react";
 import { cn } from "../utils/classname";
 
 interface DraggableVideoProps {
@@ -26,11 +26,11 @@ export function DraggableVideo({
       const parent = containerRef.current.parentElement;
       if (parent) {
         const parentRect = parent.getBoundingClientRect();
+        const containerRect = containerRef.current.getBoundingClientRect();
         const padding = 20;
-        // Position in bottom-right corner
         setPosition({
-          x: parentRect.width - 192 - padding, // 192px = w-48
-          y: parentRect.height - 144 - padding, // 144px = h-36
+          x: parentRect.width - containerRect.width - padding,
+          y: parentRect.height - containerRect.height - padding,
         });
         setInitialized(true);
       }
@@ -38,6 +38,36 @@ export function DraggableVideo({
       setInitialized(false);
     }
   }, [connected, initialized]);
+
+  useEffect(() => {
+    if (!connected) return;
+
+    const handleResize = () => {
+      if (containerRef.current) {
+        const parent = containerRef.current.parentElement;
+        if (parent) {
+          const parentRect = parent.getBoundingClientRect();
+          const containerRect = containerRef.current.getBoundingClientRect();
+          const padding = 20;
+
+          // Clamp position to stay within bounds
+          setPosition((prev) => ({
+            x: Math.min(
+              prev.x,
+              parentRect.width - containerRect.width - padding,
+            ),
+            y: Math.min(
+              prev.y,
+              parentRect.height - containerRect.height - padding,
+            ),
+          }));
+        }
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [connected]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
@@ -120,8 +150,9 @@ export function DraggableVideo({
       className={cn(
         "absolute rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 ease-out z-20",
         connected
-          ? "w-48 h-36 cursor-move"
-          : "w-[90%] max-w-xl aspect-video top-[50%] left-1/2 -translate-x-1/2 -translate-y-1/2",
+          ? "w-32 sm:w-44 md:w-55 lg:w-70 cursor-grab"
+          : "w-[85%] max-w-xl max-h-7/10 top-[52%] left-1/2 -translate-x-1/2 -translate-y-1/2",
+
         isDragging && "cursor-grabbing scale-105 transition-none",
       )}
       style={
@@ -141,11 +172,13 @@ export function DraggableVideo({
         autoPlay
         muted
         playsInline
+        disablePictureInPicture
+        disableRemotePlayback
         className="w-full h-full object-cover scale-x-[-1]"
       />
       {!videoEnabled && (
         <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
-          <UserCircle size={connected ? 48 : 80} className="text-white/80" />
+          <CameraOff size={connected ? 30 : 50} className="text-gray-400" />
         </div>
       )}
       {connected && (

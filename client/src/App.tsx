@@ -94,6 +94,8 @@ function App() {
               ref={remoteVideoRef}
               autoPlay
               playsInline
+              disablePictureInPicture
+              disableRemotePlayback
               className={cn(
                 "w-full h-full object-cover transition-opacity duration-500",
                 !connected && "opacity-0",
