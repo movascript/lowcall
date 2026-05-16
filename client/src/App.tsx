@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { useVideoCall } from "./hooks/useVideoCall";
-import { Loader2, MicOff, VideoOff, SwitchCamera } from "lucide-react";
+import { MicOff, VideoOff, SwitchCamera } from "lucide-react";
 import { DraggableVideo } from "./components/DraggableVideo";
 import { ConnectionStats } from "./components/ConnectionStats";
 import { cn } from "./utils/classname";
