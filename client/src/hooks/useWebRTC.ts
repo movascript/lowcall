@@ -37,6 +37,8 @@ export const useWebRTC = (
   const prevBytesReceivedRef = useRef(0);
   const prevBytesSentRef = useRef(0);
   const prevTimeRef = useRef(Date.now());
+  const reconnectTimeoutRef = useRef<number | null>(null);
+  const isReconnectingRef = useRef(false);
 
   useEffect(() => {
     localStreamRef.current = localStream;
@@ -50,18 +52,73 @@ export const useWebRTC = (
   }, []);
 
   useEffect(() => {
-    socketRef.current = io(signalingServer);
+    socketRef.current = io(signalingServer, {
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity,
+    });
 
     const socket = socketRef.current;
 
-    // Room full handler
+    // Handle socket reconnection
+    socket.on("connect", () => {
+      console.log("Socket connected:", socket.id);
+
+      if (currentRoomRef.current && localStreamRef.current) {
+        console.log(
+          "Rejoining room after reconnection:",
+          currentRoomRef.current,
+        );
+
+        // Recreate peer connection with fresh state
+        if (peerConnectionRef.current) {
+          peerConnectionRef.current.close();
+        }
+        createPeerConnection();
+
+        socket.emit("join-room", currentRoomRef.current);
+      }
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log("Socket disconnected:", reason);
+
+      if (mountedRef.current) {
+        setConnected(false);
+      }
+
+      // If disconnect was due to transport error (network change),
+      // Socket.IO will auto-reconnect
+      if (reason === "io server disconnect") {
+        // Server kicked us, manually reconnect
+        socket.connect();
+      }
+    });
+
+    socket.on("reconnect", (attemptNumber) => {
+      console.log("Socket reconnected after", attemptNumber, "attempts");
+    });
+
+    socket.on("reconnect_attempt", (attemptNumber) => {
+      console.log("Reconnection attempt:", attemptNumber);
+    });
+
+    socket.on("reconnect_error", (error) => {
+      console.error("Reconnection error:", error);
+    });
+
+    socket.on("reconnect_failed", () => {
+      console.error("Reconnection failed");
+      alert("Unable to reconnect to server. Please refresh the page.");
+    });
+
     socket.on("room-full", () => {
       alert("Room is full. Maximum 2 users allowed.");
       cleanupAll();
       window.location.reload();
     });
 
-    // Remote mute state handlers
     socket.on("peer-audio-toggle", (enabled: boolean) => {
       setRemoteAudioEnabled(enabled);
     });
@@ -120,6 +177,11 @@ export const useWebRTC = (
       }
     });
 
+    socket.on("ice-restart", async () => {
+      console.log("ICE restart requested by peer");
+      await handleIceRestart();
+    });
+
     socket.on("user-disconnected", () => {
       if (mountedRef.current) {
         setConnected(false);
@@ -158,10 +220,43 @@ export const useWebRTC = (
     pendingCandidatesRef.current = [];
   }
 
+  async function handleIceRestart() {
+    const pc = peerConnectionRef.current;
+    if (!pc || isReconnectingRef.current) return;
+
+    isReconnectingRef.current = true;
+
+    try {
+      const offer = await pc.createOffer({ iceRestart: true });
+      await pc.setLocalDescription(offer);
+      socketRef.current?.emit("offer", {
+        roomId: currentRoomRef.current,
+        offer,
+      });
+      console.log("ICE restart offer sent");
+    } catch (error) {
+      console.error("ICE restart failed:", error);
+    } finally {
+      isReconnectingRef.current = false;
+    }
+  }
+
+  function scheduleReconnect() {
+    if (reconnectTimeoutRef.current) return;
+
+    reconnectTimeoutRef.current = setTimeout(() => {
+      console.log("Attempting reconnection...");
+      handleIceRestart();
+      reconnectTimeoutRef.current = null;
+    }, 3000) as unknown as number;
+  }
+
   function createPeerConnection(): RTCPeerConnection {
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
     }
+
+    pendingCandidatesRef.current = []; // Clear stale candidates
 
     const pc = new RTCPeerConnection(iceServers);
     peerConnectionRef.current = pc;
@@ -187,8 +282,46 @@ export const useWebRTC = (
       startStatsMonitoring();
     };
 
+    pc.oniceconnectionstatechange = () => {
+      console.log("ICE connection state:", pc.iceConnectionState);
+
+      if (pc.iceConnectionState === "disconnected") {
+        console.log("Connection lost, attempting ICE restart...");
+        scheduleReconnect();
+      }
+
+      if (pc.iceConnectionState === "failed") {
+        console.log("Connection failed, forcing ICE restart...");
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = null;
+        }
+        handleIceRestart();
+      }
+
+      if (
+        pc.iceConnectionState === "connected" ||
+        pc.iceConnectionState === "completed"
+      ) {
+        console.log("Connection restored");
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = null;
+        }
+        isReconnectingRef.current = false; // Reset flag
+      }
+    };
+
     pc.onconnectionstatechange = () => {
-      if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
+      console.log("Connection state:", pc.connectionState);
+
+      if (["disconnected", "failed"].includes(pc.connectionState)) {
+        if (mountedRef.current) {
+          setConnected(false);
+        }
+      }
+
+      if (pc.connectionState === "closed") {
         if (mountedRef.current) {
           setConnected(false);
           setRemoteStream(null);
@@ -333,6 +466,10 @@ export const useWebRTC = (
   }
 
   function cleanupAll() {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;

@@ -131,6 +131,12 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("ice-candidate", data.candidate);
   });
 
+  socket.on("ice-restart", (data) => {
+    const roomId = data.roomId.toLowerCase();
+    console.log("ICE restart requested by:", socket.id, "in room:", roomId);
+    socket.to(roomId).emit("ice-restart");
+  });
+
   socket.on("audio-toggle", ({ roomId, enabled }) => {
     // Normalize roomId to lowercase
     roomId = roomId.toLowerCase();
