@@ -10,6 +10,7 @@ import { useDialingSound } from "./hooks/useDialingSound";
 import ControlBar from "./components/ControlBar";
 import LandingPage from "./components/LandingPage";
 import { usePreventRefresh } from "./hooks/usePreventRefresh";
+import { Spinner } from "./ui/Spinner";
 
 function App() {
   const [roomId, setRoomId] = useState("");
@@ -116,21 +117,22 @@ function App() {
             )}
 
             {!connected && (
-              <div className="absolute inset-0 flex justify-center bg-linear-to-br from-gray-900 to-black text-white z-10">
+              <div className=" absolute inset-0 flex justify-center bg-linear-to-br from-gray-900 to-black text-white z-10">
                 <div className="flex gap-2 h-0 items-center justify-center mt-10">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <p className="text-lg font-medium">Connecting...</p>
-                  <p className="text-sm text-white/60">Room: {roomId}</p>
+                  <Spinner variant="ring" className="w-8 h-8 text-primary" />
+                  <p className="text-sm text-white/70">Room: {roomId}</p>
                 </div>
               </div>
             )}
 
-            <ConnectionStats
-              stats={stats}
-              showStats={showStats}
-              onToggle={setShowStats}
-              callDuration={callDuration}
-            />
+            {connected && (
+              <ConnectionStats
+                stats={stats}
+                showStats={showStats}
+                onToggle={setShowStats}
+                callDuration={callDuration}
+              />
+            )}
 
             {connected && canSwitchCamera && (
               <button
