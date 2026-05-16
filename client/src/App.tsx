@@ -68,7 +68,7 @@ function App() {
   }, [remoteStream]);
 
   const handleJoinRoom = async () => {
-    if (!roomId.toLowerCase().trim()) return;
+    if (!roomId.trim()) return;
     try {
       await joinRoom(roomId);
       setJoined(true);

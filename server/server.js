@@ -77,6 +77,9 @@ io.on("connection", (socket) => {
   console.log("New user connected:", socket.id);
 
   socket.on("join-room", (roomId) => {
+    // Normalize roomId to lowercase
+    roomId = roomId.toLowerCase();
+
     // Clean up any previous room membership
     handleDisconnect(socket.id, false);
 
@@ -105,21 +108,33 @@ io.on("connection", (socket) => {
   });
 
   socket.on("offer", (data) => {
-    console.log("Offer received from:", socket.id, "to room:", data.roomId);
-    socket.to(data.roomId).emit("offer", data.offer);
+    // Normalize roomId to lowercase
+    const roomId = data.roomId.toLowerCase();
+
+    console.log("Offer received from:", socket.id, "to room:", roomId);
+    socket.to(roomId).emit("offer", data.offer);
   });
 
   socket.on("answer", (data) => {
-    console.log("Answer received from:", socket.id, "to room:", data.roomId);
-    socket.to(data.roomId).emit("answer", data.answer);
+    // Normalize roomId to lowercase
+    const roomId = data.roomId.toLowerCase();
+
+    console.log("Answer received from:", socket.id, "to room:", roomId);
+    socket.to(roomId).emit("answer", data.answer);
   });
 
   socket.on("ice-candidate", (data) => {
+    // Normalize roomId to lowercase
+    const roomId = data.roomId.toLowerCase();
+
     console.log("ICE candidate received from:", socket.id);
-    socket.to(data.roomId).emit("ice-candidate", data.candidate);
+    socket.to(roomId).emit("ice-candidate", data.candidate);
   });
 
   socket.on("audio-toggle", ({ roomId, enabled }) => {
+    // Normalize roomId to lowercase
+    roomId = roomId.toLowerCase();
+
     const room = rooms.get(roomId);
     if (!room) return;
 
@@ -130,6 +145,9 @@ io.on("connection", (socket) => {
   });
 
   socket.on("video-toggle", ({ roomId, enabled }) => {
+    // Normalize roomId to lowercase
+    roomId = roomId.toLowerCase();
+
     const room = rooms.get(roomId);
     if (!room) return;
 
@@ -140,6 +158,9 @@ io.on("connection", (socket) => {
   });
 
   socket.on("leave-room", (roomId) => {
+    // Normalize roomId to lowercase
+    roomId = roomId.toLowerCase();
+
     console.log("User leaving room:", socket.id, roomId);
     socket.to(roomId).emit("user-disconnected");
     handleDisconnect(socket.id, true);
