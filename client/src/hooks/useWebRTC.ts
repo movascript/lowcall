@@ -30,7 +30,6 @@ export const useWebRTC = (
   callbacks?: WebRTCCallbacks,
 ) => {
   const [connected, setConnected] = useState(false);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [stats, setStats] = useState<ConnectionStatus>(initialStats);
   const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(true);
@@ -48,10 +47,6 @@ export const useWebRTC = (
   const prevTimeRef = useRef(Date.now());
   const reconnectTimeoutRef = useRef<number | null>(null);
   const isReconnectingRef = useRef(false);
-
-  useEffect(() => {
-    localStreamRef.current = localStream;
-  }, [localStream]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -487,13 +482,8 @@ export const useWebRTC = (
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
-    const stream = localStreamRef.current;
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-    }
     stopStatsMonitoring();
     if (mountedRef.current) {
-      setLocalStream(null);
       setConnected(false);
       setRemoteStream(null);
       setStats(initialStats);
@@ -503,36 +493,18 @@ export const useWebRTC = (
     localStreamRef.current = null;
   }
 
-  useEffect(() => {
-    if (localStream && currentRoomRef.current && !peerConnectionRef.current) {
+  const setLocalStream = (stream: MediaStream | null) => {
+    localStreamRef.current = stream;
+    if (stream && currentRoomRef.current && !peerConnectionRef.current) {
       createPeerConnection();
     }
-  }, [localStream]);
+  };
 
-  const joinRoom = async (roomId: string) => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 24 },
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      localStreamRef.current = stream;
-      currentRoomRef.current = roomId;
-      setLocalStream(stream);
-      socketRef.current?.emit("join-room", roomId);
-      return stream;
-    } catch (error) {
-      console.error("Error accessing camera/microphone:", error);
-      throw error;
-    }
+  const joinRoom = (roomId: string, stream: MediaStream) => {
+    localStreamRef.current = stream;
+    currentRoomRef.current = roomId;
+    createPeerConnection();
+    socketRef.current?.emit("join-room", roomId);
   };
 
   const leaveRoom = () => {
@@ -579,10 +551,10 @@ export const useWebRTC = (
   return {
     connected,
     stats,
-    localStream,
     remoteStream,
     remoteAudioEnabled,
     remoteVideoEnabled,
+    setLocalStream,
     joinRoom,
     leaveRoom,
     notifyPeerAudioToggle,

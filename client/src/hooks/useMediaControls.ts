@@ -7,12 +7,29 @@ interface MediaControlsCallbacks {
   onCameraSwitch?: (newTrack: MediaStreamTrack) => void;
 }
 
-export const useMediaControls = (
-  stream: MediaStream | null,
-  callbacks?: MediaControlsCallbacks,
-) => {
+interface VideoQualityConfig {
+  width: { ideal: number };
+  height: { ideal: number };
+  frameRate: { ideal: number };
+}
+
+const HD_CONFIG: VideoQualityConfig = {
+  width: { ideal: 1280 },
+  height: { ideal: 720 },
+  frameRate: { ideal: 24 },
+};
+
+const SD_CONFIG: VideoQualityConfig = {
+  width: { ideal: 640 },
+  height: { ideal: 480 },
+  frameRate: { ideal: 20 },
+};
+
+export const useMediaControls = (callbacks?: MediaControlsCallbacks) => {
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
+  const [hdEnabled, setHdEnabled] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [canSwitchCamera, setCanSwitchCamera] = useState(false);
 
@@ -38,6 +55,45 @@ export const useMediaControls = (
     checkCameras();
   }, []);
 
+  const getMediaStream = async (
+    videoConfig?: VideoQualityConfig,
+  ): Promise<MediaStream> => {
+    const config = videoConfig || (hdEnabled ? HD_CONFIG : SD_CONFIG);
+
+    return await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: facingMode },
+        ...config,
+      },
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+  };
+
+  const initializeMedia = async (): Promise<MediaStream> => {
+    try {
+      const newStream = await getMediaStream();
+      setStream(newStream);
+      streamRef.current = newStream;
+      return newStream;
+    } catch (error) {
+      console.error("Error accessing camera/microphone:", error);
+      throw error;
+    }
+  };
+
+  const stopMedia = () => {
+    const currentStream = streamRef.current;
+    if (currentStream) {
+      currentStream.getTracks().forEach((track) => track.stop());
+      setStream(null);
+      streamRef.current = null;
+    }
+  };
+
   const toggleAudio = () => {
     const currentStream = streamRef.current;
     if (currentStream) {
@@ -62,19 +118,55 @@ export const useMediaControls = (
     }
   };
 
+  const toggleHD = async (): Promise<MediaStreamTrack | null> => {
+    const currentStream = streamRef.current;
+    if (!currentStream) return null;
+
+    try {
+      const newHdState = !hdEnabled;
+      const config = newHdState ? HD_CONFIG : SD_CONFIG;
+
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facingMode },
+          ...config,
+        },
+        audio: false,
+      });
+
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const oldVideoTrack = currentStream.getVideoTracks()[0];
+
+      if (oldVideoTrack) {
+        currentStream.removeTrack(oldVideoTrack);
+        currentStream.addTrack(newVideoTrack);
+
+        newVideoTrack.enabled = videoEnabled;
+
+        oldVideoTrack.stop();
+      }
+
+      setHdEnabled(newHdState);
+      callbacks?.onCameraSwitch?.(newVideoTrack);
+      return newVideoTrack;
+    } catch (error) {
+      console.error("Error toggling HD:", error);
+      return null;
+    }
+  };
+
   const switchCamera = async (): Promise<MediaStreamTrack | null> => {
     const currentStream = streamRef.current;
     if (!currentStream) return null;
 
     try {
       const newFacingMode = facingMode === "user" ? "environment" : "user";
+      const config = hdEnabled ? HD_CONFIG : SD_CONFIG;
 
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: newFacingMode },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 24 },
+          ...config,
         },
         audio: false,
       });
@@ -101,12 +193,17 @@ export const useMediaControls = (
   };
 
   return {
+    stream,
     audioEnabled,
     videoEnabled,
+    hdEnabled,
     canSwitchCamera,
     facingMode,
+    initializeMedia,
+    stopMedia,
     toggleAudio,
     toggleVideo,
+    toggleHD,
     switchCamera,
   };
 };

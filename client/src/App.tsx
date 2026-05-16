@@ -24,11 +24,13 @@ function App() {
     remoteStream,
     audioEnabled,
     videoEnabled,
+    hdEnabled,
     canSwitchCamera,
     remoteAudioEnabled,
     remoteVideoEnabled,
     toggleAudio,
     toggleVideo,
+    toggleHD,
     switchCamera,
     joinRoom,
     leaveRoom,
@@ -151,8 +153,10 @@ function App() {
           <ControlBar
             audioEnabled={audioEnabled}
             videoEnabled={videoEnabled}
+            hdEnabled={hdEnabled}
             toggleAudio={toggleAudio}
             toggleVideo={toggleVideo}
+            toggleHD={toggleHD}
             handleLeaveCall={handleLeaveCall}
           />
         </div>

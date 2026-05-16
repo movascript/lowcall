@@ -8,25 +8,30 @@ export const useVideoCall = () => {
   const {
     connected,
     stats,
-    localStream,
     remoteStream,
     remoteAudioEnabled,
     remoteVideoEnabled,
-    joinRoom,
-    leaveRoom,
+    setLocalStream,
+    joinRoom: webrtcJoinRoom,
+    leaveRoom: webrtcLeaveRoom,
     notifyPeerAudioToggle,
     notifyPeerVideoToggle,
     replaceVideoTrack,
   } = useWebRTC(signalingServer, iceServers);
 
   const {
+    stream: localStream,
     audioEnabled,
     videoEnabled,
+    hdEnabled,
     canSwitchCamera,
+    initializeMedia,
+    stopMedia,
     toggleAudio,
     toggleVideo,
+    toggleHD,
     switchCamera,
-  } = useMediaControls(localStream, {
+  } = useMediaControls({
     onAudioToggle: notifyPeerAudioToggle,
     onVideoToggle: notifyPeerVideoToggle,
     onCameraSwitch: async (newTrack) => {
@@ -38,8 +43,29 @@ export const useVideoCall = () => {
 
   const callDuration = useCallTimer(connected);
 
+  const joinRoom = async (roomId: string) => {
+    try {
+      const stream = await initializeMedia();
+      setLocalStream(stream);
+      webrtcJoinRoom(roomId, stream);
+      return stream;
+    } catch (error) {
+      console.error("Error joining room:", error);
+      throw error;
+    }
+  };
+
+  const leaveRoom = () => {
+    webrtcLeaveRoom();
+    stopMedia();
+  };
+
   const handleSwitchCamera = async () => {
     await switchCamera();
+  };
+
+  const handleToggleHD = async () => {
+    await toggleHD();
   };
 
   return {
@@ -55,9 +81,11 @@ export const useVideoCall = () => {
     // Local controls
     audioEnabled,
     videoEnabled,
+    hdEnabled,
     canSwitchCamera,
     toggleAudio,
     toggleVideo,
+    toggleHD: handleToggleHD,
     switchCamera: handleSwitchCamera,
 
     // Remote state
