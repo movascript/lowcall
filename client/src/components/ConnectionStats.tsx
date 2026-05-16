@@ -9,6 +9,7 @@ interface ConnectionStatsProps {
   stats: ConnectionStatus;
   showStats: boolean;
   onToggle: (show: boolean) => void;
+  callDuration: string;
 }
 
 const getPingColor = (ping: number) => {
@@ -22,6 +23,7 @@ export function ConnectionStats({
   stats,
   showStats,
   onToggle,
+  callDuration,
 }: ConnectionStatsProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -54,7 +56,7 @@ export function ConnectionStats({
       {!showStats ? (
         <button
           onClick={() => onToggle(true)}
-          className="animate-in fade-in slide-in-from-bottom-4 flex items-center gap-2 px-3 py-2 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-full text-white transition-all shadow-lg border border-white/10"
+          className="animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3 px-4 py-2 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-full text-white transition-all shadow-lg border border-white/10"
           title="Show connection details"
         >
           <span style={{ color: getConnectionColor() }}>
@@ -72,6 +74,8 @@ export function ConnectionStats({
           <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-3">
             <span className="text-white px-2 font-medium text-sm flex items-center gap-2">
               <Activity size={16} /> Connection Info
+              <span className="mx-1">•</span>
+              <span className="text-white/60 text-xs">{callDuration}</span>
             </span>
             <button
               onClick={() => onToggle(false)}

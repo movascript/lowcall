@@ -4,7 +4,7 @@ import "./App.css";
 import { useWebRTC } from "./hooks/useWebRTC";
 import { useMediaControls } from "./hooks/useMediaControls";
 import { iceServers, signalingServer } from "./utils/constants";
-import { Loader2, MicOff, VideoOff } from "lucide-react";
+import { Loader2, MicOff, VideoOff, SwitchCamera } from "lucide-react";
 import { DraggableVideo } from "./components/DraggableVideo";
 import { ConnectionStats } from "./components/ConnectionStats";
 import { cn } from "./utils/classname";
@@ -12,6 +12,7 @@ import { useDialingSound } from "./hooks/useDialingSound";
 import ControlBar from "./components/ControlBar";
 import LandingPage from "./components/LandingPage";
 import { usePreventRefresh } from "./hooks/usePreventRefresh";
+import { useCallTimer } from "./hooks/useCallTimer";
 
 function App() {
   const [roomId, setRoomId] = useState("");
@@ -29,9 +30,10 @@ function App() {
     leaveRoom,
     notifyPeerAudioToggle,
     notifyPeerVideoToggle,
+    replaceVideoTrack,
   } = useWebRTC(signalingServer, iceServers);
 
-  console.log("au", remoteAudioEnabled, remoteVideoEnabled);
+  const callDuration = useCallTimer(connected);
 
   useDialingSound(joined, connected);
 
@@ -81,6 +83,13 @@ function App() {
     setShowStats(false);
   };
 
+  const handleSwitchCamera = async () => {
+    const newTrack = await switchCamera();
+    if (newTrack && connected) {
+      await replaceVideoTrack(newTrack);
+    }
+  };
+
   return (
     <div className="w-screen h-screen bg-linear-to-br from-primary via-primary to-accent overflow-hidden">
       {!joined ? (
@@ -104,21 +113,27 @@ function App() {
               )}
             />
 
-            {/* Remote user mute indicators */}
-            {connected && (
-              <div className="absolute top-4 left-4 flex gap-2 z-20">
-                {!remoteAudioEnabled && (
-                  <div className="bg-red-500/90 text-white px-3 py-2 rounded-lg flex items-center gap-2">
-                    <MicOff className="w-4 h-4" />
-                    <span className="text-sm font-medium">Muted</span>
+            {/* Remote user video off overlay */}
+            {connected && !remoteVideoEnabled && (
+              <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center">
+                    <VideoOff className="w-12 h-12 text-white/60" />
                   </div>
-                )}
-                {!remoteVideoEnabled && (
-                  <div className="bg-red-500/90 text-white px-3 py-2 rounded-lg flex items-center gap-2">
-                    <VideoOff className="w-4 h-4" />
-                    <span className="text-sm font-medium">Camera Off</span>
-                  </div>
-                )}
+                  <span className="text-white/80 text-lg font-medium">
+                    Camera Off
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Remote user audio off indicator */}
+            {connected && !remoteAudioEnabled && (
+              <div className="absolute top-20 left-5 z-20">
+                <div className="bg-red-500/90 backdrop-blur-sm text-white px-3 py-2 rounded-full flex items-center gap-2 shadow-lg">
+                  <MicOff className="w-4 h-4" />
+                  <span className="text-sm font-medium">Muted</span>
+                </div>
               </div>
             )}
 
@@ -132,17 +147,28 @@ function App() {
               </div>
             )}
 
-            {connected && (
-              <ConnectionStats
-                stats={stats}
-                showStats={showStats}
-                onToggle={setShowStats}
-              />
+            <ConnectionStats
+              stats={stats}
+              showStats={showStats}
+              onToggle={setShowStats}
+              callDuration={callDuration}
+            />
+
+            {/* Switch Camera Button - Top Left */}
+            {connected && canSwitchCamera && (
+              <button
+                onClick={handleSwitchCamera}
+                className="absolute top-5 right-5 z-30 p-3 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-full text-white transition-all shadow-lg border border-white/10 hover:scale-105 active:scale-95"
+                title="Switch Camera"
+              >
+                <SwitchCamera size={20} />
+              </button>
             )}
 
             <DraggableVideo
               videoRef={localVideoRef}
               videoEnabled={videoEnabled}
+              audioEnabled={audioEnabled}
               connected={connected}
             />
           </div>
@@ -150,10 +176,8 @@ function App() {
           <ControlBar
             audioEnabled={audioEnabled}
             videoEnabled={videoEnabled}
-            canSwitchCamera={canSwitchCamera}
             toggleAudio={toggleAudio}
             toggleVideo={toggleVideo}
-            switchCamera={switchCamera}
             handleLeaveCall={handleLeaveCall}
           />
         </div>

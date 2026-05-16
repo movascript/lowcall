@@ -1,30 +1,20 @@
+// src/components/ControlBar.tsx
 import { ControlButton } from "./ControlButton";
-import {
-  Mic,
-  MicOff,
-  Video,
-  VideoOff,
-  Phone,
-  SwitchCamera,
-} from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Phone } from "lucide-react";
 
 interface ControlBarProps {
   audioEnabled: boolean;
   videoEnabled: boolean;
-  canSwitchCamera: boolean;
   toggleAudio: () => void;
   toggleVideo: () => void;
-  switchCamera: () => void;
   handleLeaveCall: () => void;
 }
 
 const ControlBar = ({
   audioEnabled,
   videoEnabled,
-  canSwitchCamera,
   toggleAudio,
   toggleVideo,
-  switchCamera,
   handleLeaveCall,
 }: ControlBarProps) => {
   return (
@@ -38,13 +28,6 @@ const ControlBar = ({
         icon={videoEnabled ? Video : VideoOff}
         onClick={toggleVideo}
         active={videoEnabled}
-      />
-      <ControlButton
-        icon={SwitchCamera}
-        onClick={switchCamera}
-        active={false}
-        variant="primary"
-        disabled={!canSwitchCamera}
       />
       <ControlButton
         icon={Phone}

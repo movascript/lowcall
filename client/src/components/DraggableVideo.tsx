@@ -1,17 +1,19 @@
 // src/components/DraggableVideo.tsx
 import { useEffect, useRef, useState } from "react";
-import { CameraOff } from "lucide-react";
+import { CameraOff, MicOff } from "lucide-react";
 import { cn } from "../utils/classname";
 
 interface DraggableVideoProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   videoEnabled: boolean;
+  audioEnabled: boolean;
   connected: boolean;
 }
 
 export function DraggableVideo({
   videoRef,
   videoEnabled,
+  audioEnabled,
   connected,
 }: DraggableVideoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -179,6 +181,11 @@ export function DraggableVideo({
       {!videoEnabled && (
         <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
           <CameraOff size={connected ? 30 : 50} className="text-gray-400" />
+        </div>
+      )}
+      {!audioEnabled && connected && (
+        <div className="absolute top-2 right-2 bg-gray-800/20 backdrop-blur-sm rounded-full p-1.5">
+          <MicOff className="text-white size-3 md:size-4" />
         </div>
       )}
       {connected && (

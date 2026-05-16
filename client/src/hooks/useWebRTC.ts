@@ -411,6 +411,21 @@ export const useWebRTC = (
     }
   };
 
+  const replaceVideoTrack = async (newTrack: MediaStreamTrack) => {
+    const pc = peerConnectionRef.current;
+    if (!pc) return;
+
+    try {
+      const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+
+      if (sender) {
+        await sender.replaceTrack(newTrack);
+      }
+    } catch (error) {
+      console.error("Error replacing video track:", error);
+    }
+  };
+
   return {
     connected,
     stats,
@@ -422,5 +437,6 @@ export const useWebRTC = (
     leaveRoom,
     notifyPeerAudioToggle,
     notifyPeerVideoToggle,
+    replaceVideoTrack,
   };
 };
