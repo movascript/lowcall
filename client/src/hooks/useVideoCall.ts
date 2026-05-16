@@ -3,6 +3,7 @@ import { useWebRTC } from "./useWebRTC";
 import { useMediaControls } from "./useMediaControls";
 import { useCallTimer } from "./useCallTimer";
 import { iceServers, signalingServer } from "../utils/constants";
+import { useEffect } from "react";
 
 export const useVideoCall = () => {
   const {
@@ -31,15 +32,22 @@ export const useVideoCall = () => {
     toggleVideo,
     toggleHD,
     switchCamera,
-  } = useMediaControls({
-    onAudioToggle: notifyPeerAudioToggle,
-    onVideoToggle: notifyPeerVideoToggle,
-    onCameraSwitch: async (newTrack) => {
-      if (connected) {
-        await replaceVideoTrack(newTrack);
+  } = useMediaControls();
+
+  useEffect(() => {
+    if (connected && localStream) {
+      const audioTrack = localStream.getAudioTracks()[0];
+      const videoTrack = localStream.getVideoTracks()[0];
+
+      if (audioTrack) {
+        notifyPeerAudioToggle(audioTrack.enabled);
       }
-    },
-  });
+
+      if (videoTrack) {
+        notifyPeerVideoToggle(videoTrack.enabled);
+      }
+    }
+  }, [connected]);
 
   const callDuration = useCallTimer(connected);
 
@@ -60,12 +68,44 @@ export const useVideoCall = () => {
     stopMedia();
   };
 
+  const handleToggleAudio = () => {
+    toggleAudio();
+    if (localStream) {
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        notifyPeerAudioToggle(audioTrack.enabled);
+      }
+    }
+  };
+
+  const handleToggleVideo = () => {
+    toggleVideo();
+    if (localStream) {
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack) {
+        notifyPeerVideoToggle(videoTrack.enabled);
+      }
+    }
+  };
+
   const handleSwitchCamera = async () => {
-    await switchCamera();
+    const newTrack = await switchCamera();
+    if (newTrack == null) {
+      alert("debug: why the heck the track is null");
+      console.log("debug: why the heck the track is null");
+      return;
+    }
+    await replaceVideoTrack(newTrack);
   };
 
   const handleToggleHD = async () => {
-    await toggleHD();
+    const newTrack = await toggleHD();
+    if (newTrack == null) {
+      alert("debug: why the heck the track is null");
+      console.log("debug: why the heck the track is null");
+      return;
+    }
+    await replaceVideoTrack(newTrack);
   };
 
   return {
@@ -83,8 +123,8 @@ export const useVideoCall = () => {
     videoEnabled,
     hdEnabled,
     canSwitchCamera,
-    toggleAudio,
-    toggleVideo,
+    toggleAudio: handleToggleAudio,
+    toggleVideo: handleToggleVideo,
     toggleHD: handleToggleHD,
     switchCamera: handleSwitchCamera,
 

@@ -1,12 +1,6 @@
 // src/hooks/useMediaControls.ts
 import { useState, useEffect, useRef } from "react";
 
-interface MediaControlsCallbacks {
-  onAudioToggle?: (enabled: boolean) => void;
-  onVideoToggle?: (enabled: boolean) => void;
-  onCameraSwitch?: (newTrack: MediaStreamTrack) => void;
-}
-
 interface VideoQualityConfig {
   width: { ideal: number };
   height: { ideal: number };
@@ -25,7 +19,7 @@ const SD_CONFIG: VideoQualityConfig = {
   frameRate: { ideal: 20 },
 };
 
-export const useMediaControls = (callbacks?: MediaControlsCallbacks) => {
+export const useMediaControls = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
@@ -101,7 +95,6 @@ export const useMediaControls = (callbacks?: MediaControlsCallbacks) => {
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setAudioEnabled(audioTrack.enabled);
-        callbacks?.onAudioToggle?.(audioTrack.enabled);
       }
     }
   };
@@ -113,7 +106,6 @@ export const useMediaControls = (callbacks?: MediaControlsCallbacks) => {
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setVideoEnabled(videoTrack.enabled);
-        callbacks?.onVideoToggle?.(videoTrack.enabled);
       }
     }
   };
@@ -147,7 +139,6 @@ export const useMediaControls = (callbacks?: MediaControlsCallbacks) => {
       }
 
       setHdEnabled(newHdState);
-      callbacks?.onCameraSwitch?.(newVideoTrack);
       return newVideoTrack;
     } catch (error) {
       console.error("Error toggling HD:", error);
@@ -184,7 +175,6 @@ export const useMediaControls = (callbacks?: MediaControlsCallbacks) => {
       }
 
       setFacingMode(newFacingMode);
-      callbacks?.onCameraSwitch?.(newVideoTrack);
       return newVideoTrack;
     } catch (error) {
       console.error("Error switching camera:", error);
