@@ -1,9 +1,7 @@
 // src/App.tsx
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
-import { useWebRTC } from "./hooks/useWebRTC";
-import { useMediaControls } from "./hooks/useMediaControls";
-import { iceServers, signalingServer } from "./utils/constants";
+import { useVideoCall } from "./hooks/useVideoCall";
 import { Loader2, MicOff, VideoOff, SwitchCamera } from "lucide-react";
 import { DraggableVideo } from "./components/DraggableVideo";
 import { ConnectionStats } from "./components/ConnectionStats";
@@ -12,7 +10,6 @@ import { useDialingSound } from "./hooks/useDialingSound";
 import ControlBar from "./components/ControlBar";
 import LandingPage from "./components/LandingPage";
 import { usePreventRefresh } from "./hooks/usePreventRefresh";
-import { useCallTimer } from "./hooks/useCallTimer";
 
 function App() {
   const [roomId, setRoomId] = useState("");
@@ -22,37 +19,25 @@ function App() {
   const {
     connected,
     stats,
+    callDuration,
     localStream,
     remoteStream,
-    remoteAudioEnabled,
-    remoteVideoEnabled,
-    joinRoom,
-    leaveRoom,
-    notifyPeerAudioToggle,
-    notifyPeerVideoToggle,
-    replaceVideoTrack,
-  } = useWebRTC(signalingServer, iceServers);
-
-  const callDuration = useCallTimer(connected);
-
-  useDialingSound(joined, connected);
-
-  const {
     audioEnabled,
     videoEnabled,
     canSwitchCamera,
+    remoteAudioEnabled,
+    remoteVideoEnabled,
     toggleAudio,
     toggleVideo,
     switchCamera,
-  } = useMediaControls(
-    localStream,
-    notifyPeerAudioToggle,
-    notifyPeerVideoToggle,
-  );
+    joinRoom,
+    leaveRoom,
+  } = useVideoCall();
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
+  useDialingSound(joined, connected);
   usePreventRefresh(joined && connected);
 
   useEffect(() => {
@@ -83,13 +68,6 @@ function App() {
     setShowStats(false);
   };
 
-  const handleSwitchCamera = async () => {
-    const newTrack = await switchCamera();
-    if (newTrack && connected) {
-      await replaceVideoTrack(newTrack);
-    }
-  };
-
   return (
     <div className="w-screen h-screen bg-linear-to-br from-primary via-primary to-accent overflow-hidden">
       {!joined ? (
@@ -113,7 +91,6 @@ function App() {
               )}
             />
 
-            {/* Remote user video off overlay */}
             {connected && !remoteVideoEnabled && (
               <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
                 <div className="flex flex-col items-center gap-4">
@@ -127,7 +104,6 @@ function App() {
               </div>
             )}
 
-            {/* Remote user audio off indicator */}
             {connected && !remoteAudioEnabled && (
               <div className="absolute top-20 left-5 z-20">
                 <div className="bg-red-500/90 backdrop-blur-sm text-white px-3 py-2 rounded-full flex items-center gap-2 shadow-lg">
@@ -154,10 +130,9 @@ function App() {
               callDuration={callDuration}
             />
 
-            {/* Switch Camera Button - Top Left */}
             {connected && canSwitchCamera && (
               <button
-                onClick={handleSwitchCamera}
+                onClick={switchCamera}
                 className="absolute top-5 right-5 z-30 p-3 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-full text-white transition-all shadow-lg border border-white/10 hover:scale-105 active:scale-95"
                 title="Switch Camera"
               >

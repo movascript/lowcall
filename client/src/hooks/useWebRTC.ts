@@ -1,3 +1,4 @@
+// src/hooks/useWebRTC.ts
 import { useEffect, useRef, useState } from "react";
 import io, { Socket } from "socket.io-client";
 import type { ConnectionStatus } from "../types";
@@ -16,9 +17,17 @@ const initialStats: ConnectionStatus = {
   totalBytesSent: 0,
 };
 
+interface WebRTCCallbacks {
+  onRemoteAudioToggle?: (enabled: boolean) => void;
+  onRemoteVideoToggle?: (enabled: boolean) => void;
+  onConnected?: () => void;
+  onDisconnected?: () => void;
+}
+
 export const useWebRTC = (
   signalingServer: string,
   iceServers: RTCConfiguration,
+  callbacks?: WebRTCCallbacks,
 ) => {
   const [connected, setConnected] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -61,7 +70,6 @@ export const useWebRTC = (
 
     const socket = socketRef.current;
 
-    // Handle socket reconnection
     socket.on("connect", () => {
       console.log("Socket connected:", socket.id);
 
@@ -71,7 +79,6 @@ export const useWebRTC = (
           currentRoomRef.current,
         );
 
-        // Recreate peer connection with fresh state
         if (peerConnectionRef.current) {
           peerConnectionRef.current.close();
         }
@@ -86,12 +93,10 @@ export const useWebRTC = (
 
       if (mountedRef.current) {
         setConnected(false);
+        callbacks?.onDisconnected?.();
       }
 
-      // If disconnect was due to transport error (network change),
-      // Socket.IO will auto-reconnect
       if (reason === "io server disconnect") {
-        // Server kicked us, manually reconnect
         socket.connect();
       }
     });
@@ -121,10 +126,12 @@ export const useWebRTC = (
 
     socket.on("peer-audio-toggle", (enabled: boolean) => {
       setRemoteAudioEnabled(enabled);
+      callbacks?.onRemoteAudioToggle?.(enabled);
     });
 
     socket.on("peer-video-toggle", (enabled: boolean) => {
       setRemoteVideoEnabled(enabled);
+      callbacks?.onRemoteVideoToggle?.(enabled);
     });
 
     socket.on("ready", async () => {
@@ -189,6 +196,7 @@ export const useWebRTC = (
         setStats(initialStats);
         setRemoteAudioEnabled(true);
         setRemoteVideoEnabled(true);
+        callbacks?.onDisconnected?.();
       }
       stopStatsMonitoring();
       if (peerConnectionRef.current) {
@@ -256,7 +264,7 @@ export const useWebRTC = (
       peerConnectionRef.current.close();
     }
 
-    pendingCandidatesRef.current = []; // Clear stale candidates
+    pendingCandidatesRef.current = [];
 
     const pc = new RTCPeerConnection(iceServers);
     peerConnectionRef.current = pc;
@@ -278,7 +286,10 @@ export const useWebRTC = (
         }
         return next;
       });
-      if (mountedRef.current) setConnected(true);
+      if (mountedRef.current) {
+        setConnected(true);
+        callbacks?.onConnected?.();
+      }
       startStatsMonitoring();
     };
 
@@ -308,7 +319,7 @@ export const useWebRTC = (
           clearTimeout(reconnectTimeoutRef.current);
           reconnectTimeoutRef.current = null;
         }
-        isReconnectingRef.current = false; // Reset flag
+        isReconnectingRef.current = false;
       }
     };
 
@@ -318,6 +329,7 @@ export const useWebRTC = (
       if (["disconnected", "failed"].includes(pc.connectionState)) {
         if (mountedRef.current) {
           setConnected(false);
+          callbacks?.onDisconnected?.();
         }
       }
 
@@ -328,6 +340,7 @@ export const useWebRTC = (
           setStats(initialStats);
           setRemoteAudioEnabled(true);
           setRemoteVideoEnabled(true);
+          callbacks?.onDisconnected?.();
         }
         stopStatsMonitoring();
       }

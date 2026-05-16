@@ -1,18 +1,28 @@
 // src/hooks/useMediaControls.ts
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+
+interface MediaControlsCallbacks {
+  onAudioToggle?: (enabled: boolean) => void;
+  onVideoToggle?: (enabled: boolean) => void;
+  onCameraSwitch?: (newTrack: MediaStreamTrack) => void;
+}
 
 export const useMediaControls = (
   stream: MediaStream | null,
-  onAudioToggle?: (enabled: boolean) => void,
-  onVideoToggle?: (enabled: boolean) => void,
+  callbacks?: MediaControlsCallbacks,
 ) => {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [canSwitchCamera, setCanSwitchCamera] = useState(false);
 
+  const streamRef = useRef<MediaStream | null>(null);
+
   useEffect(() => {
-    // Check if device has multiple cameras
+    streamRef.current = stream;
+  }, [stream]);
+
+  useEffect(() => {
     const checkCameras = async () => {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -29,29 +39,32 @@ export const useMediaControls = (
   }, []);
 
   const toggleAudio = () => {
-    if (stream) {
-      const audioTrack = stream.getAudioTracks()[0];
+    const currentStream = streamRef.current;
+    if (currentStream) {
+      const audioTrack = currentStream.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setAudioEnabled(audioTrack.enabled);
-        onAudioToggle?.(audioTrack.enabled);
+        callbacks?.onAudioToggle?.(audioTrack.enabled);
       }
     }
   };
 
   const toggleVideo = () => {
-    if (stream) {
-      const videoTrack = stream.getVideoTracks()[0];
+    const currentStream = streamRef.current;
+    if (currentStream) {
+      const videoTrack = currentStream.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setVideoEnabled(videoTrack.enabled);
-        onVideoToggle?.(videoTrack.enabled);
+        callbacks?.onVideoToggle?.(videoTrack.enabled);
       }
     }
   };
 
   const switchCamera = async (): Promise<MediaStreamTrack | null> => {
-    if (!stream) return null;
+    const currentStream = streamRef.current;
+    if (!currentStream) return null;
 
     try {
       const newFacingMode = facingMode === "user" ? "environment" : "user";
@@ -67,21 +80,19 @@ export const useMediaControls = (
       });
 
       const newVideoTrack = newStream.getVideoTracks()[0];
-      const oldVideoTrack = stream.getVideoTracks()[0];
+      const oldVideoTrack = currentStream.getVideoTracks()[0];
 
       if (oldVideoTrack) {
-        // Replace track in the stream
-        stream.removeTrack(oldVideoTrack);
-        stream.addTrack(newVideoTrack);
+        currentStream.removeTrack(oldVideoTrack);
+        currentStream.addTrack(newVideoTrack);
 
-        // Preserve enabled state
         newVideoTrack.enabled = videoEnabled;
 
-        // Stop old track
         oldVideoTrack.stop();
       }
 
       setFacingMode(newFacingMode);
+      callbacks?.onCameraSwitch?.(newVideoTrack);
       return newVideoTrack;
     } catch (error) {
       console.error("Error switching camera:", error);
