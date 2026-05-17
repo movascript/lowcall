@@ -1,21 +1,7 @@
 // src/hooks/useWebRTC.ts
 import { useEffect, useRef, useState } from "react";
 import io, { Socket } from "socket.io-client";
-import type { ConnectionStatus } from "../types";
-
-const initialStats: ConnectionStatus = {
-  ping: 0,
-  bitrateReceived: 0,
-  bitrateSent: 0,
-  packetLoss: 0,
-  protocol: "N/A",
-  candidateType: "N/A",
-  networkType: "N/A",
-  localAddress: "N/A",
-  remoteAddress: "N/A",
-  totalBytesReceived: 0,
-  totalBytesSent: 0,
-};
+import { useConnectionStats } from "./useConnectionStats";
 
 interface WebRTCCallbacks {
   onRemoteAudioToggle?: (enabled: boolean) => void;
@@ -31,22 +17,22 @@ export const useWebRTC = (
 ) => {
   const [connected, setConnected] = useState(false);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [stats, setStats] = useState<ConnectionStatus>(initialStats);
   const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(true);
   const [remoteVideoEnabled, setRemoteVideoEnabled] = useState(true);
 
   const socketRef = useRef<Socket | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const statsIntervalRef = useRef<number | null>(null);
   const currentRoomRef = useRef("");
   const localStreamRef = useRef<MediaStream | null>(null);
   const mountedRef = useRef(true);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
-  const prevBytesReceivedRef = useRef(0);
-  const prevBytesSentRef = useRef(0);
-  const prevTimeRef = useRef(Date.now());
   const reconnectTimeoutRef = useRef<number | null>(null);
   const isReconnectingRef = useRef(false);
+
+  const { stats, resetStats } = useConnectionStats(
+    peerConnectionRef.current,
+    connected,
+  );
 
   useEffect(() => {
     mountedRef.current = true;
@@ -188,12 +174,11 @@ export const useWebRTC = (
       if (mountedRef.current) {
         setConnected(false);
         setRemoteStream(null);
-        setStats(initialStats);
+        resetStats();
         setRemoteAudioEnabled(true);
         setRemoteVideoEnabled(true);
         callbacks?.onDisconnected?.();
       }
-      stopStatsMonitoring();
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
         peerConnectionRef.current = null;
@@ -285,7 +270,6 @@ export const useWebRTC = (
         setConnected(true);
         callbacks?.onConnected?.();
       }
-      startStatsMonitoring();
     };
 
     pc.oniceconnectionstatechange = () => {
@@ -332,12 +316,11 @@ export const useWebRTC = (
         if (mountedRef.current) {
           setConnected(false);
           setRemoteStream(null);
-          setStats(initialStats);
+          resetStats();
           setRemoteAudioEnabled(true);
           setRemoteVideoEnabled(true);
           callbacks?.onDisconnected?.();
         }
-        stopStatsMonitoring();
       }
     };
 
@@ -349,130 +332,6 @@ export const useWebRTC = (
     return pc;
   }
 
-  function startStatsMonitoring() {
-    stopStatsMonitoring();
-    prevBytesReceivedRef.current = 0;
-    prevBytesSentRef.current = 0;
-    prevTimeRef.current = Date.now();
-
-    statsIntervalRef.current = setInterval(async () => {
-      const pc = peerConnectionRef.current;
-      if (!pc) return;
-
-      try {
-        const statsReport = await pc.getStats();
-        let bytesReceived = 0,
-          bytesSent = 0,
-          packetLoss = 0,
-          rtt = 0,
-          protocol = "N/A",
-          candidateType = "N/A",
-          networkType = "N/A",
-          localAddress = "N/A",
-          remoteAddress = "N/A",
-          localCandidateId = "",
-          remoteCandidateId = "";
-
-        statsReport.forEach((report) => {
-          if (report.type === "inbound-rtp") {
-            if (report.bytesReceived) bytesReceived += report.bytesReceived;
-            if (report.packetsLost && report.packetsReceived) {
-              packetLoss = Math.round(
-                (report.packetsLost /
-                  (report.packetsLost + report.packetsReceived)) *
-                  100,
-              );
-            }
-          }
-          if (report.type === "outbound-rtp") {
-            if (report.bytesSent) bytesSent += report.bytesSent;
-          }
-          if (
-            report.type === "candidate-pair" &&
-            report.state === "succeeded"
-          ) {
-            rtt = report.currentRoundTripTime
-              ? Math.round(report.currentRoundTripTime * 1000)
-              : 0;
-            localCandidateId = report.localCandidateId;
-            remoteCandidateId = report.remoteCandidateId;
-          }
-        });
-
-        statsReport.forEach((report) => {
-          if (
-            report.type === "local-candidate" &&
-            report.id === localCandidateId
-          ) {
-            protocol = report.protocol?.toUpperCase() || "N/A";
-            candidateType = report.candidateType || "N/A";
-            networkType = report.networkType || "N/A";
-            localAddress = report.address
-              ? `${report.address}:${report.port}`
-              : "N/A";
-          }
-          if (
-            report.type === "remote-candidate" &&
-            report.id === remoteCandidateId
-          ) {
-            remoteAddress = report.address
-              ? `${report.address}:${report.port}`
-              : "N/A";
-          }
-        });
-
-        const now = Date.now();
-        const dt = (now - prevTimeRef.current) / 1000;
-
-        const bitrateReceived =
-          dt > 0
-            ? Math.round((bytesReceived - prevBytesReceivedRef.current) / dt)
-            : 0;
-
-        const bitrateSent =
-          dt > 0 ? Math.round((bytesSent - prevBytesSentRef.current) / dt) : 0;
-
-        prevBytesReceivedRef.current = bytesReceived;
-        prevBytesSentRef.current = bytesSent;
-        prevTimeRef.current = now;
-
-        const connectionMethod =
-          candidateType === "relay"
-            ? "TURN"
-            : candidateType === "srflx"
-              ? "STUN"
-              : candidateType === "host"
-                ? "P2P"
-                : candidateType.toUpperCase();
-
-        if (mountedRef.current) {
-          setStats({
-            ping: rtt,
-            bitrateReceived,
-            bitrateSent,
-            packetLoss,
-            protocol,
-            candidateType: connectionMethod,
-            networkType,
-            localAddress,
-            remoteAddress,
-            totalBytesReceived: bytesReceived,
-            totalBytesSent: bytesSent,
-          });
-        }
-      } catch (err) {
-        console.error("Stats error:", err);
-      }
-    }, 1000) as unknown as number;
-  }
-
-  function stopStatsMonitoring() {
-    if (statsIntervalRef.current) {
-      clearInterval(statsIntervalRef.current);
-      statsIntervalRef.current = null;
-    }
-  }
-
   function cleanupAll() {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -482,11 +341,10 @@ export const useWebRTC = (
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
-    stopStatsMonitoring();
     if (mountedRef.current) {
       setConnected(false);
       setRemoteStream(null);
-      setStats(initialStats);
+      resetStats();
       setRemoteAudioEnabled(true);
       setRemoteVideoEnabled(true);
     }
