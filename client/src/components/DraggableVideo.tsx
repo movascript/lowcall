@@ -22,54 +22,72 @@ export function DraggableVideo({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [initialized, setInitialized] = useState(false);
 
+  const PADDING = 20;
+
+  // Helper function to get constrained position
+  const getConstrainedPosition = (x: number, y: number) => {
+    if (!containerRef.current) return { x, y };
+
+    const parent = containerRef.current.parentElement;
+    if (!parent) return { x, y };
+
+    const parentWidth = parent.clientWidth;
+    const parentHeight = parent.clientHeight;
+    const containerWidth = containerRef.current.offsetWidth;
+    const containerHeight = containerRef.current.offsetHeight;
+
+    const maxX = parentWidth - containerWidth - PADDING;
+    const maxY = parentHeight - containerHeight - PADDING;
+
+    return {
+      x: Math.max(PADDING, Math.min(x, maxX)),
+      y: Math.max(PADDING, Math.min(y, maxY)),
+    };
+  };
+
   // Initialize position to bottom-right when connected
   useEffect(() => {
     if (connected && !initialized && containerRef.current) {
-      const parent = containerRef.current.parentElement;
-      if (parent) {
-        const parentRect = parent.getBoundingClientRect();
-        const containerRect = containerRef.current.getBoundingClientRect();
-        const padding = 20;
-        setPosition({
-          x: parentRect.width - containerRect.width - padding,
-          y: parentRect.height - containerRect.height - padding,
-        });
-        setInitialized(true);
-      }
+      // Wait for CSS transition to complete (500ms) plus buffer
+      const timer = setTimeout(() => {
+        if (!containerRef.current) return;
+
+        const parent = containerRef.current.parentElement;
+        if (parent) {
+          const parentWidth = parent.clientWidth;
+          const parentHeight = parent.clientHeight;
+          const containerWidth = containerRef.current.offsetWidth;
+          const containerHeight = containerRef.current.offsetHeight;
+
+          const newPosition = {
+            x: parentWidth - containerWidth - PADDING,
+            y: parentHeight - containerHeight - PADDING,
+          };
+
+          setPosition(getConstrainedPosition(newPosition.x, newPosition.y));
+          setInitialized(true);
+        }
+      }, 550); // Match CSS transition duration (500ms) + 50ms buffer
+
+      return () => clearTimeout(timer);
     } else if (!connected) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInitialized(false);
+      setPosition({ x: 0, y: 0 }); // Reset position when disconnected
     }
   }, [connected, initialized]);
 
+  // Handle window resize
   useEffect(() => {
-    if (!connected) return;
+    if (!connected || !initialized) return;
 
     const handleResize = () => {
-      if (containerRef.current) {
-        const parent = containerRef.current.parentElement;
-        if (parent) {
-          const parentRect = parent.getBoundingClientRect();
-          const containerRect = containerRef.current.getBoundingClientRect();
-          const padding = 20;
-
-          // Clamp position to stay within bounds
-          setPosition((prev) => ({
-            x: Math.min(
-              prev.x,
-              parentRect.width - containerRect.width - padding,
-            ),
-            y: Math.min(
-              prev.y,
-              parentRect.height - containerRect.height - padding,
-            ),
-          }));
-        }
-      }
+      setPosition((prev) => getConstrainedPosition(prev.x, prev.y));
     };
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [connected]);
+  }, [connected, initialized]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
@@ -103,19 +121,11 @@ export function DraggableVideo({
       if (!parent) return;
 
       const parentRect = parent.getBoundingClientRect();
-      const containerRect = containerRef.current.getBoundingClientRect();
 
-      const padding = 16;
-      const maxX = parentRect.width - containerRect.width - padding;
-      const maxY = parentRect.height - containerRect.height - padding;
+      const newX = clientX - parentRect.left - dragOffset.x;
+      const newY = clientY - parentRect.top - dragOffset.y;
 
-      let newX = clientX - parentRect.left - dragOffset.x;
-      let newY = clientY - parentRect.top - dragOffset.y;
-
-      newX = Math.max(padding, Math.min(newX, maxX));
-      newY = Math.max(padding, Math.min(newY, maxY));
-
-      setPosition({ x: newX, y: newY });
+      setPosition(getConstrainedPosition(newX, newY));
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -150,7 +160,7 @@ export function DraggableVideo({
     <div
       ref={containerRef}
       className={cn(
-        "absolute rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 ease-out z-20",
+        "absolute rounded-2xl overflow-hidden shadow-2xl transition-all duration-400 ease-out z-20",
         connected
           ? "w-32 sm:w-44 md:w-55 lg:w-70 cursor-grab"
           : "w-[85%] max-w-xl max-h-7/10 top-[52%] left-1/2 -translate-x-1/2 -translate-y-1/2",
@@ -158,13 +168,20 @@ export function DraggableVideo({
         isDragging && "cursor-grabbing scale-105 transition-none",
       )}
       style={
-        connected
+        connected && initialized
           ? {
               left: `${position.x}px`,
               top: `${position.y}px`,
               transform: "none",
             }
-          : undefined
+          : connected
+            ? {
+                // Temporarily keep centered during initialization
+                left: "50%",
+                top: "50%",
+                transform: "translate(-50%, -50%)",
+              }
+            : undefined
       }
       onMouseDown={connected ? handleMouseDown : undefined}
       onTouchStart={connected ? handleTouchStart : undefined}

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { useVideoCall } from "./hooks/useVideoCall";
-import { MicOff, VideoOff, SwitchCamera } from "lucide-react";
+import { MicOff, CameraOff, SwitchCamera } from "lucide-react";
 import { DraggableVideo } from "./components/DraggableVideo";
 import { ConnectionStats } from "./components/ConnectionStats";
 import { cn } from "./utils/classname";
@@ -101,7 +101,7 @@ function App() {
               <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
                 <div className="flex flex-col items-center gap-4">
                   <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center">
-                    <VideoOff className="w-12 h-12 text-white/60" />
+                    <CameraOff className="w-12 h-12 text-gray-400" />
                   </div>
                   <span className="text-white/80 text-lg font-medium">
                     Camera Off
