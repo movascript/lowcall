@@ -6,7 +6,6 @@ import { MicOff, VideoOff, SwitchCamera } from "lucide-react";
 import { DraggableVideo } from "./components/DraggableVideo";
 import { ConnectionStats } from "./components/ConnectionStats";
 import { cn } from "./utils/classname";
-import { useDialingSound } from "./hooks/useDialingSound";
 import ControlBar from "./components/ControlBar";
 import LandingPage from "./components/LandingPage";
 import { usePreventRefresh } from "./hooks/usePreventRefresh";
@@ -40,7 +39,9 @@ function App() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
-  useDialingSound(joined, connected);
+  // disabled for now to be fixed in future hopefully
+  // useDialingSound(joined, connected);
+
   usePreventRefresh(joined && connected);
 
   useEffect(() => {
