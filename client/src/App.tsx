@@ -21,7 +21,6 @@ function App() {
   const {
     connected,
     stats,
-    callDuration,
     localStream,
     remoteStream,
     audioEnabled,
@@ -135,7 +134,6 @@ function App() {
                     stats={stats}
                     showStats={showStats}
                     onToggle={setShowStats}
-                    callDuration={callDuration}
                   />
                 )}
               </div>

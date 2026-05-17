@@ -1,7 +1,6 @@
 // src/hooks/useVideoCall.ts
 import { useWebRTC } from "./useWebRTC";
 import { useMediaControls } from "./useMediaControls";
-import { useCallTimer } from "./useCallTimer";
 import { iceServers, signalingServer } from "../utils/constants";
 import { useEffect } from "react";
 
@@ -48,8 +47,6 @@ export const useVideoCall = () => {
       }
     }
   }, [connected]);
-
-  const callDuration = useCallTimer(connected);
 
   const joinRoom = async (roomId: string) => {
     try {
@@ -112,7 +109,6 @@ export const useVideoCall = () => {
     // Connection state
     connected,
     stats,
-    callDuration,
 
     // Streams
     localStream,
