@@ -10,6 +10,8 @@ import ControlBar from "./components/ControlBar";
 import LandingPage from "./components/LandingPage";
 import { usePreventRefresh } from "./hooks/usePreventRefresh";
 import { Spinner } from "./ui/Spinner";
+import TopBarButton from "./components/TopBarButton";
+import TopBar from "./components/TopBar";
 
 function App() {
   const [roomId, setRoomId] = useState("");
@@ -126,24 +128,24 @@ function App() {
               </div>
             )}
 
-            {connected && (
-              <ConnectionStats
-                stats={stats}
-                showStats={showStats}
-                onToggle={setShowStats}
-                callDuration={callDuration}
-              />
-            )}
+            <TopBar>
+              {connected && (
+                <ConnectionStats
+                  stats={stats}
+                  showStats={showStats}
+                  onToggle={setShowStats}
+                  callDuration={callDuration}
+                />
+              )}
 
-            {connected && canSwitchCamera && (
-              <button
-                onClick={switchCamera}
-                className="absolute top-5 right-5 z-30 p-3 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-full text-white transition-all shadow-lg border border-white/10 hover:scale-105 active:scale-95"
-                title="Switch Camera"
-              >
-                <SwitchCamera size={20} />
-              </button>
-            )}
+              {connected && canSwitchCamera && (
+                <TopBarButton
+                  onClick={switchCamera}
+                  Icon={SwitchCamera}
+                  title="Switch Camera"
+                />
+              )}
+            </TopBar>
 
             <DraggableVideo
               videoRef={localVideoRef}

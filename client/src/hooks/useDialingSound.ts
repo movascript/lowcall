@@ -1,5 +1,8 @@
 import { useEffect, useRef } from "react";
 
+// disabled for now to be fixed in future hopefully
+// useDialingSound(joined, connected);
+
 export const useDialingSound = (joined: boolean, connected: boolean) => {
   const ringAudioRef = useRef<HTMLAudioElement | null>(null);
   const connectAudioRef = useRef<HTMLAudioElement | null>(null);
