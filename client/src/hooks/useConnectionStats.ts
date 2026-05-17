@@ -181,15 +181,14 @@ export const useConnectionStats = (
     const now = Date.now();
     const dt = (now - prevTimeRef.current) / 1000;
 
+    // Calculate bytes per second (not bits per second)
     const bitrateReceived =
       dt > 0
-        ? Math.round(((bytesReceived - prevBytesReceivedRef.current) * 8) / dt)
+        ? Math.round((bytesReceived - prevBytesReceivedRef.current) / dt)
         : 0;
 
     const bitrateSent =
-      dt > 0
-        ? Math.round(((bytesSent - prevBytesSentRef.current) * 8) / dt)
-        : 0;
+      dt > 0 ? Math.round((bytesSent - prevBytesSentRef.current) / dt) : 0;
 
     prevBytesReceivedRef.current = bytesReceived;
     prevBytesSentRef.current = bytesSent;
@@ -424,10 +423,13 @@ export const useConnectionStats = (
 
     statsReport.forEach((report) => {
       if (report.type === "candidate-pair" && report.state === "succeeded") {
-        bandwidth.availableOutgoingBitrate =
-          report.availableOutgoingBitrate || 0;
-        bandwidth.availableIncomingBitrate =
-          report.availableIncomingBitrate || 0;
+        // Convert from bits per second to bytes per second
+        bandwidth.availableOutgoingBitrate = report.availableOutgoingBitrate
+          ? Math.round(report.availableOutgoingBitrate / 8)
+          : 0;
+        bandwidth.availableIncomingBitrate = report.availableIncomingBitrate
+          ? Math.round(report.availableIncomingBitrate / 8)
+          : 0;
       }
     });
 

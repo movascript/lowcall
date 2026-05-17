@@ -162,7 +162,7 @@ export function DraggableVideo({
       className={cn(
         "absolute rounded-2xl overflow-hidden shadow-2xl transition-all duration-400 ease-out z-20",
         connected
-          ? "w-32 sm:w-44 md:w-55 lg:w-70 cursor-grab"
+          ? "w-30 sm:w-40 md:w-55 lg:w-72 cursor-grab"
           : "w-[85%] max-w-xl max-h-7/10 top-[52%] left-1/2 -translate-x-1/2 -translate-y-1/2",
 
         isDragging && "cursor-grabbing scale-105 transition-none",
