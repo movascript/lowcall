@@ -7,6 +7,7 @@ import { useEffect } from "react";
 export const useVideoCall = () => {
   const {
     connected,
+    signalingConnected,
     stats,
     remoteStream,
     remoteAudioEnabled,
@@ -108,6 +109,7 @@ export const useVideoCall = () => {
   return {
     // Connection state
     connected,
+    signalingConnected,
     stats,
 
     // Streams

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { useVideoCall } from "./hooks/useVideoCall";
-import { MicOff, CameraOff, SwitchCamera } from "lucide-react";
+import { MicOff, CameraOff, SwitchCamera, Server } from "lucide-react";
 import { DraggableVideo } from "./components/DraggableVideo";
 import { ConnectionStats } from "./components/ConnectionStats";
 import { cn } from "./utils/classname";
@@ -20,6 +20,7 @@ function App() {
 
   const {
     connected,
+    signalingConnected,
     stats,
     localStream,
     remoteStream,
@@ -128,7 +129,7 @@ function App() {
             )}
 
             <TopBar>
-              <div>
+              <div className="flex gap-2">
                 {connected && (
                   <ConnectionStats
                     stats={stats}
@@ -136,6 +137,12 @@ function App() {
                     onToggle={setShowStats}
                   />
                 )}
+                <TopBarButton
+                  onClick={() => {}}
+                  Icon={Server}
+                  title="Signaling Server Status"
+                  iconColor={signalingConnected ? "#10b981" : "#ef4444"}
+                />
               </div>
 
               <div>

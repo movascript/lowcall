@@ -19,6 +19,7 @@ export const useWebRTC = (
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(true);
   const [remoteVideoEnabled, setRemoteVideoEnabled] = useState(true);
+  const [signalingConnected, setSignalingConnected] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -53,6 +54,7 @@ export const useWebRTC = (
 
     socket.on("connect", () => {
       console.log("Socket connected:", socket.id);
+      setSignalingConnected(true);
 
       if (currentRoomRef.current && localStreamRef.current) {
         console.log(
@@ -71,6 +73,7 @@ export const useWebRTC = (
 
     socket.on("disconnect", (reason) => {
       console.log("Socket disconnected:", reason);
+      setSignalingConnected(false);
 
       if (mountedRef.current) {
         setConnected(false);
@@ -408,6 +411,7 @@ export const useWebRTC = (
 
   return {
     connected,
+    signalingConnected,
     stats,
     remoteStream,
     remoteAudioEnabled,

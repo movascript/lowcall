@@ -61,6 +61,7 @@ export function ConnectionStats({
           iconColor={getConnectionColor()}
           text={`${stats.connection.ping}ms`}
           textColor={getPingColor(stats.connection.ping)}
+          title="Connection Info"
         />
       ) : (
         <div
