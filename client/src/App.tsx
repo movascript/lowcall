@@ -129,22 +129,26 @@ function App() {
             )}
 
             <TopBar>
-              {connected && (
-                <ConnectionStats
-                  stats={stats}
-                  showStats={showStats}
-                  onToggle={setShowStats}
-                  callDuration={callDuration}
-                />
-              )}
+              <div>
+                {connected && (
+                  <ConnectionStats
+                    stats={stats}
+                    showStats={showStats}
+                    onToggle={setShowStats}
+                    callDuration={callDuration}
+                  />
+                )}
+              </div>
 
-              {connected && canSwitchCamera && (
-                <TopBarButton
-                  onClick={switchCamera}
-                  Icon={SwitchCamera}
-                  title="Switch Camera"
-                />
-              )}
+              <div>
+                {connected && canSwitchCamera && (
+                  <TopBarButton
+                    onClick={switchCamera}
+                    Icon={SwitchCamera}
+                    title="Switch Camera"
+                  />
+                )}
+              </div>
             </TopBar>
 
             <DraggableVideo
