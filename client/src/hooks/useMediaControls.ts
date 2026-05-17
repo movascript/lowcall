@@ -1,22 +1,16 @@
 // src/hooks/useMediaControls.ts
 import { useState, useEffect } from "react";
 
-interface VideoQualityConfig {
-  width: { ideal: number };
-  height: { ideal: number };
-  frameRate: { ideal: number };
-}
-
-const HD_CONFIG: VideoQualityConfig = {
-  width: { ideal: 1280 },
-  height: { ideal: 720 },
-  frameRate: { ideal: 24 },
+const HD_CONFIG: MediaTrackConstraints = {
+  width: { min: 1280, ideal: 1280, max: 1920 },
+  height: { min: 720, ideal: 720, max: 1080 },
+  frameRate: { min: 15, ideal: 20, max: 24 },
 };
 
-const SD_CONFIG: VideoQualityConfig = {
-  width: { ideal: 640 },
-  height: { ideal: 480 },
-  frameRate: { ideal: 20 },
+const SD_CONFIG: MediaTrackConstraints = {
+  width: { min: 480, ideal: 640, max: 640 },
+  height: { min: 360, ideal: 480, max: 480 },
+  frameRate: { min: 10, ideal: 15, max: 20 },
 };
 
 export const useMediaControls = () => {
@@ -44,7 +38,7 @@ export const useMediaControls = () => {
   }, []);
 
   const getMediaStream = async (
-    videoConfig?: VideoQualityConfig,
+    videoConfig?: MediaTrackConstraints,
   ): Promise<MediaStream> => {
     const config = videoConfig || (hdEnabled ? HD_CONFIG : SD_CONFIG);
 
