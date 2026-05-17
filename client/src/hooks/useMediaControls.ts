@@ -1,5 +1,5 @@
 // src/hooks/useMediaControls.ts
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 interface VideoQualityConfig {
   width: { ideal: number };
@@ -26,12 +26,6 @@ export const useMediaControls = () => {
   const [hdEnabled, setHdEnabled] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [canSwitchCamera, setCanSwitchCamera] = useState(false);
-
-  const streamRef = useRef<MediaStream | null>(null);
-
-  useEffect(() => {
-    streamRef.current = stream;
-  }, [stream]);
 
   useEffect(() => {
     const checkCameras = async () => {
@@ -71,7 +65,6 @@ export const useMediaControls = () => {
     try {
       const newStream = await getMediaStream();
       setStream(newStream);
-      streamRef.current = newStream;
       return newStream;
     } catch (error) {
       console.error("Error accessing camera/microphone:", error);
@@ -80,18 +73,15 @@ export const useMediaControls = () => {
   };
 
   const stopMedia = () => {
-    const currentStream = streamRef.current;
-    if (currentStream) {
-      currentStream.getTracks().forEach((track) => track.stop());
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
       setStream(null);
-      streamRef.current = null;
     }
   };
 
   const toggleAudio = () => {
-    const currentStream = streamRef.current;
-    if (currentStream) {
-      const audioTrack = currentStream.getAudioTracks()[0];
+    if (stream) {
+      const audioTrack = stream.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setAudioEnabled(audioTrack.enabled);
@@ -100,9 +90,8 @@ export const useMediaControls = () => {
   };
 
   const toggleVideo = () => {
-    const currentStream = streamRef.current;
-    if (currentStream) {
-      const videoTrack = currentStream.getVideoTracks()[0];
+    if (stream) {
+      const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setVideoEnabled(videoTrack.enabled);
@@ -111,8 +100,7 @@ export const useMediaControls = () => {
   };
 
   const toggleHD = async (): Promise<MediaStreamTrack | null> => {
-    const currentStream = streamRef.current;
-    if (!currentStream) return null;
+    if (!stream) return null;
 
     try {
       const newHdState = !hdEnabled;
@@ -127,11 +115,11 @@ export const useMediaControls = () => {
       });
 
       const newVideoTrack = newStream.getVideoTracks()[0];
-      const oldVideoTrack = currentStream.getVideoTracks()[0];
+      const oldVideoTrack = stream.getVideoTracks()[0];
 
       if (oldVideoTrack) {
-        currentStream.removeTrack(oldVideoTrack);
-        currentStream.addTrack(newVideoTrack);
+        stream.removeTrack(oldVideoTrack);
+        stream.addTrack(newVideoTrack);
 
         newVideoTrack.enabled = videoEnabled;
 
@@ -147,8 +135,7 @@ export const useMediaControls = () => {
   };
 
   const switchCamera = async (): Promise<MediaStreamTrack | null> => {
-    const currentStream = streamRef.current;
-    if (!currentStream) return null;
+    if (!stream) return null;
 
     try {
       const newFacingMode = facingMode === "user" ? "environment" : "user";
@@ -163,11 +150,11 @@ export const useMediaControls = () => {
       });
 
       const newVideoTrack = newStream.getVideoTracks()[0];
-      const oldVideoTrack = currentStream.getVideoTracks()[0];
+      const oldVideoTrack = stream.getVideoTracks()[0];
 
       if (oldVideoTrack) {
-        currentStream.removeTrack(oldVideoTrack);
-        currentStream.addTrack(newVideoTrack);
+        stream.removeTrack(oldVideoTrack);
+        stream.addTrack(newVideoTrack);
 
         newVideoTrack.enabled = videoEnabled;
 
