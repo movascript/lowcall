@@ -200,9 +200,14 @@ export function DraggableVideo({
           <CameraOff size={connected ? 30 : 50} className="text-gray-400" />
         </div>
       )}
-      {!audioEnabled && connected && (
+      {!audioEnabled && (
         <div className="absolute top-2 right-2 bg-gray-800/20 backdrop-blur-sm rounded-full p-1.5">
-          <MicOff className="text-white size-3 md:size-4" />
+          <MicOff
+            className={cn(
+              "text-gray-200",
+              connected ? "size-3 md:size-4" : "size-4 md:size-4.5",
+            )}
+          />
         </div>
       )}
       {connected && (
