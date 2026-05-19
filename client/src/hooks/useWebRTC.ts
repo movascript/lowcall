@@ -409,6 +409,24 @@ export const useWebRTC = (
     }
   };
 
+  const replaceAudioTrack = async (newTrack: MediaStreamTrack) => {
+    const pc = peerConnectionRef.current;
+    if (!pc) return;
+
+    try {
+      const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
+
+      if (sender) {
+        await sender.replaceTrack(newTrack);
+      } else {
+        // If no sender exists, add the track
+        pc.addTrack(newTrack, localStreamRef.current!);
+      }
+    } catch (error) {
+      console.error("Error replacing audio track:", error);
+    }
+  };
+
   return {
     connected,
     signalingConnected,
@@ -422,5 +440,6 @@ export const useWebRTC = (
     notifyPeerAudioToggle,
     notifyPeerVideoToggle,
     replaceVideoTrack,
+    replaceAudioTrack,
   };
 };

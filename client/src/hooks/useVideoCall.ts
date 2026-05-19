@@ -18,6 +18,7 @@ export const useVideoCall = () => {
     notifyPeerAudioToggle,
     notifyPeerVideoToggle,
     replaceVideoTrack,
+    replaceAudioTrack,
   } = useWebRTC(signalingServer, iceServers);
 
   const {
@@ -32,6 +33,8 @@ export const useVideoCall = () => {
     toggleVideo,
     toggleHD,
     switchCamera,
+    restartAudio,
+    restartVideo,
   } = useMediaControls();
 
   useEffect(() => {
@@ -66,22 +69,36 @@ export const useVideoCall = () => {
     stopMedia();
   };
 
-  const handleToggleAudio = () => {
+  const handleToggleAudio = async () => {
+    const wasEnabled = audioEnabled;
     toggleAudio();
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        notifyPeerAudioToggle(audioTrack.enabled);
+
+    if (wasEnabled) {
+      // Disabling - track is already stopped in toggleAudio
+      notifyPeerAudioToggle(false);
+    } else {
+      // Re-enabling - need to get new track
+      const newTrack = await restartAudio();
+      if (newTrack) {
+        await replaceAudioTrack(newTrack);
+        notifyPeerAudioToggle(true);
       }
     }
   };
 
-  const handleToggleVideo = () => {
+  const handleToggleVideo = async () => {
+    const wasEnabled = videoEnabled;
     toggleVideo();
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        notifyPeerVideoToggle(videoTrack.enabled);
+
+    if (wasEnabled) {
+      // Disabling - track is already stopped in toggleVideo
+      notifyPeerVideoToggle(false);
+    } else {
+      // Re-enabling - need to get new track
+      const newTrack = await restartVideo();
+      if (newTrack) {
+        await replaceVideoTrack(newTrack);
+        notifyPeerVideoToggle(true);
       }
     }
   };

@@ -79,6 +79,11 @@ export const useMediaControls = () => {
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setAudioEnabled(audioTrack.enabled);
+
+        // Actually stop the track to release the microphone
+        if (!audioTrack.enabled) {
+          audioTrack.stop();
+        }
       }
     }
   };
@@ -89,7 +94,73 @@ export const useMediaControls = () => {
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setVideoEnabled(videoTrack.enabled);
+
+        // Actually stop the track to release the camera
+        if (!videoTrack.enabled) {
+          videoTrack.stop();
+        }
       }
+    }
+  };
+
+  const restartAudio = async (): Promise<MediaStreamTrack | null> => {
+    if (!stream) return null;
+
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        video: false,
+      });
+
+      const newAudioTrack = newStream.getAudioTracks()[0];
+      const oldAudioTrack = stream.getAudioTracks()[0];
+
+      if (oldAudioTrack) {
+        stream.removeTrack(oldAudioTrack);
+      }
+
+      stream.addTrack(newAudioTrack);
+      newAudioTrack.enabled = true;
+
+      return newAudioTrack;
+    } catch (error) {
+      console.error("Error restarting audio:", error);
+      return null;
+    }
+  };
+
+  const restartVideo = async (): Promise<MediaStreamTrack | null> => {
+    if (!stream) return null;
+
+    try {
+      const config = hdEnabled ? HD_CONFIG : SD_CONFIG;
+
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facingMode },
+          ...config,
+        },
+        audio: false,
+      });
+
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const oldVideoTrack = stream.getVideoTracks()[0];
+
+      if (oldVideoTrack) {
+        stream.removeTrack(oldVideoTrack);
+      }
+
+      stream.addTrack(newVideoTrack);
+      newVideoTrack.enabled = true;
+
+      return newVideoTrack;
+    } catch (error) {
+      console.error("Error restarting video:", error);
+      return null;
     }
   };
 
@@ -176,5 +247,7 @@ export const useMediaControls = () => {
     toggleVideo,
     toggleHD,
     switchCamera,
+    restartAudio,
+    restartVideo,
   };
 };
