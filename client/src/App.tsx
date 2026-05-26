@@ -30,6 +30,7 @@ function App() {
     canSwitchCamera,
     remoteAudioEnabled,
     remoteVideoEnabled,
+    facingMode,
     toggleAudio,
     toggleVideo,
     toggleHD,
@@ -161,6 +162,7 @@ function App() {
               videoEnabled={videoEnabled}
               audioEnabled={audioEnabled}
               connected={connected}
+              facingMode={facingMode}
             />
           </div>
 

@@ -8,6 +8,7 @@ interface DraggableVideoProps {
   videoEnabled: boolean;
   audioEnabled: boolean;
   connected: boolean;
+  facingMode: "user" | "environment";
 }
 
 export function DraggableVideo({
@@ -15,6 +16,7 @@ export function DraggableVideo({
   videoEnabled,
   audioEnabled,
   connected,
+  facingMode,
 }: DraggableVideoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -193,7 +195,10 @@ export function DraggableVideo({
         playsInline
         disablePictureInPicture
         disableRemotePlayback
-        className="w-full h-full object-cover scale-x-[-1]"
+        className={cn(
+          "w-full h-full object-",
+          facingMode === "user" && "scale-x-[-1]",
+        )}
       />
       {!videoEnabled && (
         <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">

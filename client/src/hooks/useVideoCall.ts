@@ -32,6 +32,7 @@ export const useVideoCall = () => {
     toggleAudio,
     toggleVideo,
     toggleHD,
+    facingMode,
     switchCamera,
     restartAudio,
     restartVideo,
@@ -136,6 +137,7 @@ export const useVideoCall = () => {
     // Local controls
     audioEnabled,
     videoEnabled,
+    facingMode,
     hdEnabled,
     canSwitchCamera,
     toggleAudio: handleToggleAudio,
