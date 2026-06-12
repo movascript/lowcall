@@ -1,34 +1,24 @@
 // src/hooks/useWebRTC.ts
 import { useEffect, useRef, useState } from "react";
-import io, { Socket } from "socket.io-client";
+import type { SignalingEvent } from "./useSignaling";
 import { useConnectionStats } from "./useConnectionStats";
 
-interface WebRTCCallbacks {
-  onRemoteAudioToggle?: (enabled: boolean) => void;
-  onRemoteVideoToggle?: (enabled: boolean) => void;
-  onConnected?: () => void;
-  onDisconnected?: () => void;
-}
-
 export const useWebRTC = (
-  signalingServer: string,
+  signaling: SignalingEvent,
   iceServers: RTCConfiguration,
-  callbacks?: WebRTCCallbacks,
 ) => {
   const [connected, setConnected] = useState(false);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(true);
   const [remoteVideoEnabled, setRemoteVideoEnabled] = useState(true);
-  const [signalingConnected, setSignalingConnected] = useState(false);
 
-  const socketRef = useRef<Socket | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const currentRoomRef = useRef("");
   const localStreamRef = useRef<MediaStream | null>(null);
   const mountedRef = useRef(true);
-  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
-  const reconnectTimeoutRef = useRef<number | null>(null);
-  const isReconnectingRef = useRef(false);
+  const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
+  const reconnectTimeout = useRef<number | null>(null);
+  const isReconnecting = useRef(false);
 
   const { stats, resetStats } = useConnectionStats(
     peerConnectionRef,
@@ -42,308 +32,84 @@ export const useWebRTC = (
     };
   }, []);
 
+  // Wire all inbound signaling events directly onto the signaling object
   useEffect(() => {
-    socketRef.current = io(signalingServer, {
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: Infinity,
-    });
+    signaling.onReady = handleReady;
+    signaling.onOffer = handleOffer;
+    signaling.onAnswer = handleAnswer;
+    signaling.onIceCandidate = handleIceCandidate;
+    signaling.onIceRestart = triggerIceRestart;
+    signaling.onUserDisconnected = handleUserDisconnected;
+    signaling.onRoomFull = handleRoomFull;
+    signaling.onRemoteAudioToggle = (enabled) => setRemoteAudioEnabled(enabled);
+    signaling.onRemoteVideoToggle = (enabled) => setRemoteVideoEnabled(enabled);
+  });
 
-    const socket = socketRef.current;
+  // Re-join room when signaling reconnects while we're in a room
+  useEffect(() => {
+    if (!signaling.connected) {
+      if (mountedRef.current) setConnected(false);
+      return;
+    }
+    if (currentRoomRef.current && localStreamRef.current) {
+      console.log(
+        "Rejoining room after signaling reconnect:",
+        currentRoomRef.current,
+      );
+      createPeerConnection();
+      signaling.joinRoom(currentRoomRef.current);
+    }
+  }, [signaling.connected]);
 
-    socket.on("connect", () => {
-      console.log("Socket connected:", socket.id);
-      setSignalingConnected(true);
+  // ─── Signaling event handlers ─────────────────────────────────────────────
 
-      if (currentRoomRef.current && localStreamRef.current) {
-        console.log(
-          "Rejoining room after reconnection:",
-          currentRoomRef.current,
-        );
-
-        if (peerConnectionRef.current) {
-          peerConnectionRef.current.close();
-        }
-        createPeerConnection();
-
-        socket.emit("join-room", currentRoomRef.current);
-      }
-    });
-
-    socket.on("disconnect", (reason) => {
-      console.log("Socket disconnected:", reason);
-      setSignalingConnected(false);
-
-      if (mountedRef.current) {
-        setConnected(false);
-        callbacks?.onDisconnected?.();
-      }
-
-      if (reason === "io server disconnect") {
-        socket.connect();
-      }
-    });
-
-    socket.on("reconnect", (attemptNumber) => {
-      console.log("Socket reconnected after", attemptNumber, "attempts");
-    });
-
-    socket.on("reconnect_attempt", (attemptNumber) => {
-      console.log("Reconnection attempt:", attemptNumber);
-    });
-
-    socket.on("reconnect_error", (error) => {
-      console.error("Reconnection error:", error);
-    });
-
-    socket.on("reconnect_failed", () => {
-      console.error("Reconnection failed");
-      alert("Unable to reconnect to server. Please refresh the page.");
-    });
-
-    socket.on("room-full", () => {
-      alert("Room is full. Maximum 2 users allowed.");
-      cleanupAll();
-      window.location.reload();
-    });
-
-    socket.on("peer-audio-toggle", (enabled: boolean) => {
-      setRemoteAudioEnabled(enabled);
-      callbacks?.onRemoteAudioToggle?.(enabled);
-    });
-
-    socket.on("peer-video-toggle", (enabled: boolean) => {
-      setRemoteVideoEnabled(enabled);
-      callbacks?.onRemoteVideoToggle?.(enabled);
-    });
-
-    socket.on("ready", async () => {
-      const pc = peerConnectionRef.current;
-      if (!pc) return;
-
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit("offer", { roomId: currentRoomRef.current, offer });
-      } catch (error) {
-        console.error("Offer error:", error);
-      }
-    });
-
-    socket.on("offer", async (offer: RTCSessionDescriptionInit) => {
-      try {
-        let pc = peerConnectionRef.current;
-        if (!pc) {
-          pc = createPeerConnection();
-        }
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        flushPendingCandidates();
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socket.emit("answer", { roomId: currentRoomRef.current, answer });
-      } catch (error) {
-        console.error("Answer error:", error);
-      }
-    });
-
-    socket.on("answer", async (answer: RTCSessionDescriptionInit) => {
-      const pc = peerConnectionRef.current;
-      if (pc && pc.signalingState !== "stable") {
-        await pc.setRemoteDescription(new RTCSessionDescription(answer));
-        flushPendingCandidates();
-      }
-    });
-
-    socket.on("ice-candidate", async (candidate: RTCIceCandidateInit) => {
-      try {
-        const pc = peerConnectionRef.current;
-        if (pc && pc.remoteDescription) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        } else {
-          pendingCandidatesRef.current.push(candidate);
-        }
-      } catch (e) {
-        console.error("ICE error:", e);
-      }
-    });
-
-    socket.on("ice-restart", async () => {
-      console.log("ICE restart requested by peer");
-      await handleIceRestart();
-    });
-
-    socket.on("user-disconnected", () => {
-      if (mountedRef.current) {
-        setConnected(false);
-        setRemoteStream(null);
-        resetStats();
-        setRemoteAudioEnabled(true);
-        setRemoteVideoEnabled(true);
-        callbacks?.onDisconnected?.();
-      }
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
-      if (currentRoomRef.current && localStreamRef.current) {
-        createPeerConnection();
-      }
-    });
-
-    return () => {
-      socket.disconnect();
-      cleanupAll();
-    };
-  }, [signalingServer]);
-
-  function flushPendingCandidates() {
+  async function handleReady() {
     const pc = peerConnectionRef.current;
-    if (!pc || !pc.remoteDescription) return;
-
-    pendingCandidatesRef.current.forEach(async (candidate) => {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (e) {
-        console.error("Queued ICE error:", e);
-      }
-    });
-    pendingCandidatesRef.current = [];
-  }
-
-  async function handleIceRestart() {
-    const pc = peerConnectionRef.current;
-    if (!pc || isReconnectingRef.current) return;
-
-    isReconnectingRef.current = true;
-
+    if (!pc) return;
     try {
-      const offer = await pc.createOffer({ iceRestart: true });
+      const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      socketRef.current?.emit("offer", {
-        roomId: currentRoomRef.current,
-        offer,
-      });
-      console.log("ICE restart offer sent");
+      signaling.sendOffer(currentRoomRef.current, offer);
     } catch (error) {
-      console.error("ICE restart failed:", error);
-    } finally {
-      isReconnectingRef.current = false;
+      console.error("Offer error:", error);
     }
   }
 
-  function scheduleReconnect() {
-    if (reconnectTimeoutRef.current) return;
-
-    reconnectTimeoutRef.current = setTimeout(() => {
-      console.log("Attempting reconnection...");
-      handleIceRestart();
-      reconnectTimeoutRef.current = null;
-    }, 3000) as unknown as number;
+  async function handleOffer(offer: RTCSessionDescriptionInit) {
+    try {
+      const pc = peerConnectionRef.current ?? createPeerConnection();
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      flushPendingCandidates();
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      signaling.sendAnswer(currentRoomRef.current, answer);
+    } catch (error) {
+      console.error("Answer error:", error);
+    }
   }
 
-  function createPeerConnection(): RTCPeerConnection {
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
+  async function handleAnswer(answer: RTCSessionDescriptionInit) {
+    const pc = peerConnectionRef.current;
+    if (pc && pc.signalingState !== "stable") {
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      flushPendingCandidates();
     }
-
-    pendingCandidatesRef.current = [];
-
-    const pc = new RTCPeerConnection(iceServers);
-    peerConnectionRef.current = pc;
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate && socketRef.current) {
-        socketRef.current.emit("ice-candidate", {
-          roomId: currentRoomRef.current,
-          candidate: event.candidate,
-        });
-      }
-    };
-
-    pc.ontrack = (event) => {
-      setRemoteStream((prev) => {
-        const next = new MediaStream(prev ? prev.getTracks() : []);
-        if (!next.getTracks().find((t) => t.id === event.track.id)) {
-          next.addTrack(event.track);
-        }
-        return next;
-      });
-      if (mountedRef.current) {
-        setConnected(true);
-        callbacks?.onConnected?.();
-      }
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      console.log("ICE connection state:", pc.iceConnectionState);
-
-      if (pc.iceConnectionState === "disconnected") {
-        console.log("Connection lost, attempting ICE restart...");
-        scheduleReconnect();
-      }
-
-      if (pc.iceConnectionState === "failed") {
-        console.log("Connection failed, forcing ICE restart...");
-        if (reconnectTimeoutRef.current) {
-          clearTimeout(reconnectTimeoutRef.current);
-          reconnectTimeoutRef.current = null;
-        }
-        handleIceRestart();
-      }
-
-      if (
-        pc.iceConnectionState === "connected" ||
-        pc.iceConnectionState === "completed"
-      ) {
-        console.log("Connection restored");
-        if (reconnectTimeoutRef.current) {
-          clearTimeout(reconnectTimeoutRef.current);
-          reconnectTimeoutRef.current = null;
-        }
-        isReconnectingRef.current = false;
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log("Connection state:", pc.connectionState);
-
-      if (["disconnected", "failed"].includes(pc.connectionState)) {
-        if (mountedRef.current) {
-          setConnected(false);
-          callbacks?.onDisconnected?.();
-        }
-      }
-
-      if (pc.connectionState === "closed") {
-        if (mountedRef.current) {
-          setConnected(false);
-          setRemoteStream(null);
-          resetStats();
-          setRemoteAudioEnabled(true);
-          setRemoteVideoEnabled(true);
-          callbacks?.onDisconnected?.();
-        }
-      }
-    };
-
-    const stream = localStreamRef.current;
-    if (stream) {
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-    }
-
-    return pc;
   }
 
-  function cleanupAll() {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
+  async function handleIceCandidate(candidate: RTCIceCandidateInit) {
+    const pc = peerConnectionRef.current;
+    try {
+      if (pc && pc.remoteDescription) {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } else {
+        pendingCandidates.current.push(candidate);
+      }
+    } catch (e) {
+      console.error("ICE candidate error:", e);
     }
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
+  }
+
+  function handleUserDisconnected() {
     if (mountedRef.current) {
       setConnected(false);
       setRemoteStream(null);
@@ -351,95 +117,195 @@ export const useWebRTC = (
       setRemoteAudioEnabled(true);
       setRemoteVideoEnabled(true);
     }
-    localStreamRef.current = null;
+    peerConnectionRef.current?.close();
+    peerConnectionRef.current = null;
+    if (currentRoomRef.current && localStreamRef.current)
+      createPeerConnection();
   }
 
-  const setLocalStream = (stream: MediaStream | null) => {
-    localStreamRef.current = stream;
-    if (stream && currentRoomRef.current && !peerConnectionRef.current) {
-      createPeerConnection();
+  function handleRoomFull() {
+    alert("Room is full. Maximum 2 users allowed.");
+    cleanupAll();
+    window.location.reload();
+  }
+
+  // ─── Peer connection helpers ──────────────────────────────────────────────
+
+  function flushPendingCandidates() {
+    const pc = peerConnectionRef.current;
+    if (!pc?.remoteDescription) return;
+    pendingCandidates.current.forEach(async (c) => {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(c));
+      } catch (e) {
+        console.error("Queued ICE error:", e);
+      }
+    });
+    pendingCandidates.current = [];
+  }
+
+  async function triggerIceRestart() {
+    const pc = peerConnectionRef.current;
+    if (!pc || isReconnecting.current) return;
+    isReconnecting.current = true;
+    try {
+      const offer = await pc.createOffer({ iceRestart: true });
+      await pc.setLocalDescription(offer);
+      signaling.sendOffer(currentRoomRef.current, offer);
+      console.log("ICE restart offer sent");
+    } catch (error) {
+      console.error("ICE restart failed:", error);
+    } finally {
+      isReconnecting.current = false;
     }
-  };
+  }
+
+  function scheduleReconnect() {
+    if (reconnectTimeout.current) return;
+    reconnectTimeout.current = setTimeout(() => {
+      triggerIceRestart();
+      reconnectTimeout.current = null;
+    }, 3000) as unknown as number;
+  }
+
+  function clearReconnectTimeout() {
+    if (reconnectTimeout.current) {
+      clearTimeout(reconnectTimeout.current);
+      reconnectTimeout.current = null;
+    }
+  }
+
+  function createPeerConnection(): RTCPeerConnection {
+    peerConnectionRef.current?.close();
+    pendingCandidates.current = [];
+
+    const pc = new RTCPeerConnection(iceServers);
+    peerConnectionRef.current = pc;
+
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate)
+        signaling.sendIceCandidate(currentRoomRef.current, candidate);
+    };
+
+    pc.ontrack = (event) => {
+      setRemoteStream((prev) => {
+        const next = new MediaStream(prev ? prev.getTracks() : []);
+        if (!next.getTracks().find((t) => t.id === event.track.id))
+          next.addTrack(event.track);
+        return next;
+      });
+      if (mountedRef.current) setConnected(true);
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log("ICE state:", pc.iceConnectionState);
+      if (pc.iceConnectionState === "disconnected") scheduleReconnect();
+      if (pc.iceConnectionState === "failed") {
+        clearReconnectTimeout();
+        triggerIceRestart();
+      }
+      if (
+        pc.iceConnectionState === "connected" ||
+        pc.iceConnectionState === "completed"
+      ) {
+        clearReconnectTimeout();
+        isReconnecting.current = false;
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log("Connection state:", pc.connectionState);
+      if (
+        ["disconnected", "failed"].includes(pc.connectionState) &&
+        mountedRef.current
+      ) {
+        setConnected(false);
+      }
+      if (pc.connectionState === "closed" && mountedRef.current) {
+        setConnected(false);
+        setRemoteStream(null);
+        resetStats();
+        setRemoteAudioEnabled(true);
+        setRemoteVideoEnabled(true);
+      }
+    };
+
+    localStreamRef.current
+      ?.getTracks()
+      .forEach((track) => pc.addTrack(track, localStreamRef.current!));
+
+    return pc;
+  }
+
+  function cleanupAll() {
+    clearReconnectTimeout();
+    peerConnectionRef.current?.close();
+    peerConnectionRef.current = null;
+    localStreamRef.current = null;
+    if (mountedRef.current) {
+      setConnected(false);
+      setRemoteStream(null);
+      resetStats();
+      setRemoteAudioEnabled(true);
+      setRemoteVideoEnabled(true);
+    }
+  }
+
+  // ─── Public API ───────────────────────────────────────────────────────────
 
   const joinRoom = (roomId: string, stream: MediaStream) => {
     localStreamRef.current = stream;
     currentRoomRef.current = roomId;
     createPeerConnection();
-    socketRef.current?.emit("join-room", roomId);
+    signaling.joinRoom(roomId);
   };
 
   const leaveRoom = () => {
-    if (socketRef.current && currentRoomRef.current) {
-      socketRef.current.emit("leave-room", currentRoomRef.current);
-    }
+    if (currentRoomRef.current) signaling.leaveRoom(currentRoomRef.current);
     cleanupAll();
     currentRoomRef.current = "";
   };
 
-  const notifyPeerAudioToggle = (enabled: boolean) => {
-    if (socketRef.current && currentRoomRef.current) {
-      socketRef.current.emit("audio-toggle", {
-        roomId: currentRoomRef.current,
-        enabled,
-      });
+  const replaceVideoTrack = async (track: MediaStreamTrack) => {
+    const sender = peerConnectionRef.current
+      ?.getSenders()
+      .find((s) => s.track?.kind === "video");
+    try {
+      if (sender) await sender.replaceTrack(track);
+    } catch (e) {
+      console.error("Error replacing video track:", e);
     }
   };
 
-  const notifyPeerVideoToggle = (enabled: boolean) => {
-    if (socketRef.current && currentRoomRef.current) {
-      socketRef.current.emit("video-toggle", {
-        roomId: currentRoomRef.current,
-        enabled,
-      });
-    }
-  };
-
-  const replaceVideoTrack = async (newTrack: MediaStreamTrack) => {
+  const replaceAudioTrack = async (track: MediaStreamTrack) => {
     const pc = peerConnectionRef.current;
     if (!pc) return;
-
+    const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
     try {
-      const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-
-      if (sender) {
-        await sender.replaceTrack(newTrack);
-      }
-    } catch (error) {
-      console.error("Error replacing video track:", error);
+      if (sender) await sender.replaceTrack(track);
+      else pc.addTrack(track, localStreamRef.current!);
+    } catch (e) {
+      console.error("Error replacing audio track:", e);
     }
   };
 
-  const replaceAudioTrack = async (newTrack: MediaStreamTrack) => {
-    const pc = peerConnectionRef.current;
-    if (!pc) return;
+  const notifyPeerAudioToggle = (enabled: boolean) =>
+    signaling.notifyAudioToggle(currentRoomRef.current, enabled);
 
-    try {
-      const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
-
-      if (sender) {
-        await sender.replaceTrack(newTrack);
-      } else {
-        // If no sender exists, add the track
-        pc.addTrack(newTrack, localStreamRef.current!);
-      }
-    } catch (error) {
-      console.error("Error replacing audio track:", error);
-    }
-  };
+  const notifyPeerVideoToggle = (enabled: boolean) =>
+    signaling.notifyVideoToggle(currentRoomRef.current, enabled);
 
   return {
     connected,
-    signalingConnected,
     stats,
     remoteStream,
     remoteAudioEnabled,
     remoteVideoEnabled,
-    setLocalStream,
     joinRoom,
     leaveRoom,
-    notifyPeerAudioToggle,
-    notifyPeerVideoToggle,
     replaceVideoTrack,
     replaceAudioTrack,
+    notifyPeerAudioToggle,
+    notifyPeerVideoToggle,
   };
 };

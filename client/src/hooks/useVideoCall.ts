@@ -1,155 +1,93 @@
 // src/hooks/useVideoCall.ts
+import { useEffect } from "react";
+import { useSignaling } from "./useSignaling";
 import { useWebRTC } from "./useWebRTC";
 import { useMediaControls } from "./useMediaControls";
 import { iceServers, signalingServer } from "../utils/constants";
-import { useEffect } from "react";
 
 export const useVideoCall = () => {
-  const {
-    connected,
-    signalingConnected,
-    stats,
-    remoteStream,
-    remoteAudioEnabled,
-    remoteVideoEnabled,
-    setLocalStream,
-    joinRoom: webrtcJoinRoom,
-    leaveRoom: webrtcLeaveRoom,
-    notifyPeerAudioToggle,
-    notifyPeerVideoToggle,
-    replaceVideoTrack,
-    replaceAudioTrack,
-  } = useWebRTC(signalingServer, iceServers);
-
-  const {
-    stream: localStream,
-    audioEnabled,
-    videoEnabled,
-    hdEnabled,
-    canSwitchCamera,
-    initializeMedia,
-    stopMedia,
-    toggleAudio,
-    toggleVideo,
-    toggleHD,
-    facingMode,
-    switchCamera,
-    restartAudio,
-    restartVideo,
-  } = useMediaControls();
+  const signaling = useSignaling(signalingServer);
+  const webrtc = useWebRTC(signaling, iceServers);
+  const media = useMediaControls();
 
   useEffect(() => {
-    if (connected && localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      const videoTrack = localStream.getVideoTracks()[0];
-
-      if (audioTrack) {
-        notifyPeerAudioToggle(audioTrack.enabled);
-      }
-
-      if (videoTrack) {
-        notifyPeerVideoToggle(videoTrack.enabled);
-      }
-    }
-  }, [connected]);
+    if (!webrtc.connected || !media.stream) return;
+    const audio = media.stream.getAudioTracks()[0];
+    const video = media.stream.getVideoTracks()[0];
+    if (audio) webrtc.notifyPeerAudioToggle(audio.enabled);
+    if (video) webrtc.notifyPeerVideoToggle(video.enabled);
+  }, [webrtc.connected]);
 
   const joinRoom = async (roomId: string) => {
-    try {
-      const stream = await initializeMedia();
-      setLocalStream(stream);
-      webrtcJoinRoom(roomId, stream);
-      return stream;
-    } catch (error) {
-      console.error("Error joining room:", error);
-      throw error;
-    }
+    const stream = await media.initializeMedia();
+    webrtc.joinRoom(roomId, stream);
+    return stream;
   };
 
   const leaveRoom = () => {
-    webrtcLeaveRoom();
-    stopMedia();
+    webrtc.leaveRoom();
+    media.stopMedia();
   };
 
-  const handleToggleAudio = async () => {
-    const wasEnabled = audioEnabled;
-    toggleAudio();
-
-    if (wasEnabled) {
-      // Disabling - track is already stopped in toggleAudio
-      notifyPeerAudioToggle(false);
+  const toggleAudio = async () => {
+    media.toggleAudio();
+    if (media.audioEnabled) {
+      webrtc.notifyPeerAudioToggle(false);
     } else {
-      // Re-enabling - need to get new track
-      const newTrack = await restartAudio();
-      if (newTrack) {
-        await replaceAudioTrack(newTrack);
-        notifyPeerAudioToggle(true);
+      const track = await media.restartAudio();
+      if (track) {
+        await webrtc.replaceAudioTrack(track);
+        webrtc.notifyPeerAudioToggle(true);
       }
     }
   };
 
-  const handleToggleVideo = async () => {
-    const wasEnabled = videoEnabled;
-    toggleVideo();
-
-    if (wasEnabled) {
-      // Disabling - track is already stopped in toggleVideo
-      notifyPeerVideoToggle(false);
+  const toggleVideo = async () => {
+    media.toggleVideo();
+    if (media.videoEnabled) {
+      webrtc.notifyPeerVideoToggle(false);
     } else {
-      // Re-enabling - need to get new track
-      const newTrack = await restartVideo();
-      if (newTrack) {
-        await replaceVideoTrack(newTrack);
-        notifyPeerVideoToggle(true);
+      const track = await media.restartVideo();
+      if (track) {
+        await webrtc.replaceVideoTrack(track);
+        webrtc.notifyPeerVideoToggle(true);
       }
     }
   };
 
-  const handleSwitchCamera = async () => {
-    const newTrack = await switchCamera();
-    if (newTrack == null) {
-      alert("debug: why the heck the track is null");
-      console.log("debug: why the heck the track is null");
-      return;
-    }
-    await replaceVideoTrack(newTrack);
+  const switchCamera = async () => {
+    const track = await media.switchCamera();
+    if (track) await webrtc.replaceVideoTrack(track);
   };
 
-  const handleToggleHD = async () => {
-    const newTrack = await toggleHD();
-    if (newTrack == null) {
-      alert("debug: why the heck the track is null");
-      console.log("debug: why the heck the track is null");
-      return;
-    }
-    await replaceVideoTrack(newTrack);
+  const toggleHD = async () => {
+    const track = await media.toggleHD();
+    if (track) await webrtc.replaceVideoTrack(track);
   };
 
   return {
-    // Connection state
-    connected,
-    signalingConnected,
-    stats,
-
+    // Connection
+    connected: webrtc.connected,
+    signalingConnected: signaling.connected,
+    stats: webrtc.stats,
     // Streams
-    localStream,
-    remoteStream,
-
+    localStream: media.stream,
+    remoteStream: webrtc.remoteStream,
+    // Local state
+    audioEnabled: media.audioEnabled,
+    videoEnabled: media.videoEnabled,
+    hdEnabled: media.hdEnabled,
+    facingMode: media.facingMode,
+    canSwitchCamera: media.canSwitchCamera,
     // Local controls
-    audioEnabled,
-    videoEnabled,
-    facingMode,
-    hdEnabled,
-    canSwitchCamera,
-    toggleAudio: handleToggleAudio,
-    toggleVideo: handleToggleVideo,
-    toggleHD: handleToggleHD,
-    switchCamera: handleSwitchCamera,
-
+    toggleAudio,
+    toggleVideo,
+    toggleHD,
+    switchCamera,
     // Remote state
-    remoteAudioEnabled,
-    remoteVideoEnabled,
-
-    // Room management
+    remoteAudioEnabled: webrtc.remoteAudioEnabled,
+    remoteVideoEnabled: webrtc.remoteVideoEnabled,
+    // Room
     joinRoom,
     leaveRoom,
   };
