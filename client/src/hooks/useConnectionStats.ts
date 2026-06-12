@@ -1,5 +1,5 @@
 // src/hooks/useConnectionStats.ts
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import type {
   ConnectionStatus,
   VideoStats,
@@ -70,7 +70,7 @@ const initialBandwidthStats: BandwidthStats = {
 };
 
 export const useConnectionStats = (
-  peerConnection: RTCPeerConnection | null,
+  peerConnection: RefObject<RTCPeerConnection | null>,
   isConnected: boolean,
 ) => {
   const [stats, setStats] = useState<EnhancedConnectionStats>({
@@ -449,7 +449,9 @@ export const useConnectionStats = (
       if (!peerConnection || !callStartTimeRef.current) return;
 
       try {
-        const statsReport = await peerConnection.getStats();
+        if (!peerConnection.current) return;
+
+        const statsReport = await peerConnection.current.getStats();
 
         const { connection } = extractConnectionStats(statsReport);
         const video = extractVideoStats(statsReport);

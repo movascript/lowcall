@@ -31,7 +31,7 @@ export const useWebRTC = (
   const isReconnectingRef = useRef(false);
 
   const { stats, resetStats } = useConnectionStats(
-    peerConnectionRef.current,
+    peerConnectionRef,
     connected,
   );
 
