@@ -1,17 +1,19 @@
-// src/hooks/useMediaControls.ts
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  AUDIO_CONSTRAINTS,
+  HD_VIDEO,
+  SD_VIDEO,
+} from "../utils/constants";
+import type { MediaDeviceLists } from "../types";
 
-const HD_CONFIG: MediaTrackConstraints = {
-  width: { min: 1280, ideal: 1280, max: 1920 },
-  height: { min: 720, ideal: 720, max: 1080 },
-  frameRate: { min: 15, ideal: 20, max: 24 },
-};
-
-const SD_CONFIG: MediaTrackConstraints = {
-  width: { min: 480, ideal: 640, max: 640 },
-  height: { min: 360, ideal: 480, max: 480 },
-  frameRate: { min: 10, ideal: 15, max: 20 },
-};
+async function listDevices(): Promise<MediaDeviceLists> {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  return {
+    cameras: devices.filter((d) => d.kind === "videoinput"),
+    mics: devices.filter((d) => d.kind === "audioinput"),
+    speakers: devices.filter((d) => d.kind === "audiooutput"),
+  };
+}
 
 export const useMediaControls = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -19,346 +21,251 @@ export const useMediaControls = () => {
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [hdEnabled, setHdEnabled] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
-  const [canSwitchCamera, setCanSwitchCamera] = useState(false);
+  const [devices, setDevices] = useState<MediaDeviceLists>({
+    cameras: [],
+    mics: [],
+    speakers: [],
+  });
+  const [cameraId, setCameraId] = useState("");
+  const [micId, setMicId] = useState("");
+  const [speakerId, setSpeakerId] = useState("");
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  useEffect(() => {
-    const checkCameras = async () => {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const cameras = devices.filter(
-          (device) => device.kind === "videoinput",
-        );
-        setCanSwitchCamera(cameras.length > 1);
-      } catch (error) {
-        console.error("Error enumerating devices:", error);
-      }
-    };
-
-    checkCameras();
+  const refreshDevices = useCallback(async () => {
+    try {
+      const next = await listDevices();
+      setDevices(next);
+      setCameraId((id) => id || next.cameras[0]?.deviceId || "");
+      setMicId((id) => id || next.mics[0]?.deviceId || "");
+      setSpeakerId((id) => id || next.speakers[0]?.deviceId || "");
+    } catch {
+      // Permissions may still be pending.
+    }
   }, []);
 
-  const getMediaStream = async (
-    videoConfig?: MediaTrackConstraints,
-  ): Promise<MediaStream> => {
-    const config = videoConfig || (hdEnabled ? HD_CONFIG : SD_CONFIG);
+  useEffect(() => {
+    const onChange = () => {
+      void refreshDevices();
+    };
+    navigator.mediaDevices?.addEventListener("devicechange", onChange);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- enumerate cameras/mics on mount
+    void refreshDevices();
+    return () => {
+      navigator.mediaDevices?.removeEventListener("devicechange", onChange);
+    };
+  }, [refreshDevices]);
 
-    return await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: facingMode },
-        ...config,
-      },
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
+  const buildConstraints = useCallback(
+    (opts?: {
+      hd?: boolean;
+      camera?: string;
+      mic?: string;
+      facing?: "user" | "environment";
+    }): MediaStreamConstraints => {
+      const hd = opts?.hd ?? hdEnabled;
+      const cam = opts?.camera ?? cameraId;
+      const mic = opts?.mic ?? micId;
+      const facing = opts?.facing ?? facingMode;
+      const videoConfig = hd ? HD_VIDEO : SD_VIDEO;
+
+      const video: MediaTrackConstraints = {
+        ...videoConfig,
+        facingMode: { ideal: facing },
+      };
+      if (cam) video.deviceId = { ideal: cam };
+
+      const audio: MediaTrackConstraints = { ...AUDIO_CONSTRAINTS };
+      if (mic) audio.deviceId = { ideal: mic };
+
+      return { video, audio };
+    },
+    [hdEnabled, cameraId, micId, facingMode],
+  );
+
+  const tagVideoHint = (media: MediaStream) => {
+    const video = media.getVideoTracks()[0];
+    if (video) video.contentHint = "motion";
   };
 
   const initializeMedia = async (): Promise<MediaStream> => {
+    setMediaError(null);
     try {
-      const newStream = await getMediaStream();
+      const newStream = await navigator.mediaDevices.getUserMedia(
+        buildConstraints(),
+      );
+      tagVideoHint(newStream);
+      streamRef.current?.getTracks().forEach((t) => t.stop());
       setStream(newStream);
+      streamRef.current = newStream;
+      await refreshDevices();
+      const settings = newStream.getVideoTracks()[0]?.getSettings();
+      if (settings?.deviceId) setCameraId(settings.deviceId);
+      const audioSettings = newStream.getAudioTracks()[0]?.getSettings();
+      if (audioSettings?.deviceId) setMicId(audioSettings.deviceId);
       return newStream;
     } catch (error) {
-      console.error("Error accessing camera/microphone:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not access camera or microphone";
+      setMediaError(message);
       throw error;
     }
   };
 
   const stopMedia = () => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
-    }
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setStream(null);
   };
 
-  const toggleAudio = () => {
-    if (stream) {
-      const audioTrack = stream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setAudioEnabled(audioTrack.enabled);
-
-        if (!audioTrack.enabled) {
-          audioTrack.stop();
-        }
-      }
-    }
+  const toggleAudio = (): boolean => {
+    const track = streamRef.current?.getAudioTracks()[0];
+    if (!track) return audioEnabled;
+    const next = !track.enabled;
+    track.enabled = next;
+    setAudioEnabled(next);
+    return next;
   };
 
-  const toggleVideo = () => {
-    if (stream) {
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setVideoEnabled(videoTrack.enabled);
-
-        if (!videoTrack.enabled) {
-          videoTrack.stop();
-        }
-      }
-    }
+  const toggleVideo = (): boolean => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return videoEnabled;
+    const next = !track.enabled;
+    track.enabled = next;
+    setVideoEnabled(next);
+    return next;
   };
 
-  const restartAudio = async (): Promise<MediaStreamTrack | null> => {
-    if (!stream) return null;
-
+  const replaceVideoInStream = async (
+    constraints: MediaStreamConstraints,
+  ): Promise<MediaStreamTrack | null> => {
+    const current = streamRef.current;
+    if (!current) return null;
+    const oldTrack = current.getVideoTracks()[0];
     try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-        video: false,
+      const isolated = await navigator.mediaDevices.getUserMedia({
+        video: constraints.video || true,
+        audio: false,
       });
-
-      const newAudioTrack = newStream.getAudioTracks()[0];
-      const oldAudioTrack = stream.getAudioTracks()[0];
-
-      if (oldAudioTrack) {
-        oldAudioTrack.stop();
-        stream.removeTrack(oldAudioTrack);
+      const nextTrack = isolated.getVideoTracks()[0];
+      nextTrack.contentHint = "motion";
+      nextTrack.enabled = videoEnabled;
+      if (oldTrack) {
+        oldTrack.stop();
+        current.removeTrack(oldTrack);
       }
-
-      stream.addTrack(newAudioTrack);
-      newAudioTrack.enabled = true;
-      setAudioEnabled(true);
-
-      return newAudioTrack;
-    } catch (error) {
-      console.error("Error restarting audio:", error);
+      current.addTrack(nextTrack);
+      setStream(current);
+      return nextTrack;
+    } catch {
       return null;
     }
   };
 
-  const restartVideo = async (): Promise<MediaStreamTrack | null> => {
-    if (!stream) return null;
-
+  const replaceAudioInStream = async (
+    deviceId: string,
+  ): Promise<MediaStreamTrack | null> => {
+    const current = streamRef.current;
+    if (!current) return null;
+    const oldTrack = current.getAudioTracks()[0];
     try {
-      const config = hdEnabled ? HD_CONFIG : SD_CONFIG;
-
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: facingMode },
-          ...config,
-        },
-        audio: false,
+      const isolated = await navigator.mediaDevices.getUserMedia({
+        audio: { ...AUDIO_CONSTRAINTS, deviceId: { ideal: deviceId } },
+        video: false,
       });
-
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      const oldVideoTrack = stream.getVideoTracks()[0];
-
-      if (oldVideoTrack) {
-        oldVideoTrack.stop();
-        stream.removeTrack(oldVideoTrack);
+      const nextTrack = isolated.getAudioTracks()[0];
+      nextTrack.enabled = audioEnabled;
+      if (oldTrack) {
+        oldTrack.stop();
+        current.removeTrack(oldTrack);
       }
-
-      stream.addTrack(newVideoTrack);
-      newVideoTrack.enabled = true;
-      setVideoEnabled(true);
-
-      return newVideoTrack;
-    } catch (error) {
-      console.error("Error restarting video:", error);
+      current.addTrack(nextTrack);
+      setStream(current);
+      return nextTrack;
+    } catch {
       return null;
     }
   };
 
   const toggleHD = async (): Promise<MediaStreamTrack | null> => {
-    if (!stream) {
-      console.error("toggleHD: stream is null");
-      return null;
-    }
-
-    const oldVideoTrack = stream.getVideoTracks()[0];
-    if (!oldVideoTrack) {
-      console.error("toggleHD: no video track found");
-      return null;
-    }
-
-    console.log("toggleHD: current HD state:", hdEnabled);
-    console.log("toggleHD: old track settings:", oldVideoTrack.getSettings());
-
-    try {
-      const newHdState = !hdEnabled;
-      const config = newHdState ? HD_CONFIG : SD_CONFIG;
-
-      console.log("toggleHD: requesting new track with config:", config);
-
-      // Stop old track FIRST to release the camera
-      oldVideoTrack.stop();
-
-      // Small delay to ensure camera is released
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: facingMode },
-          ...config,
-        },
-        audio: false,
-      });
-
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      console.log("toggleHD: new track settings:", newVideoTrack.getSettings());
-
-      // Remove old track from stream
-      stream.removeTrack(oldVideoTrack);
-
-      // Add new track
-      stream.addTrack(newVideoTrack);
-      newVideoTrack.enabled = videoEnabled;
-
-      setHdEnabled(newHdState);
-      return newVideoTrack;
-    } catch (error) {
-      console.error("toggleHD: Error details:", error);
-      if (error instanceof Error) {
-        console.error("toggleHD: Error name:", error.name);
-        console.error("toggleHD: Error message:", error.message);
-      }
-
-      // Try to recover by restarting with old settings
-      try {
-        const config = hdEnabled ? HD_CONFIG : SD_CONFIG;
-        const recoveryStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: facingMode },
-            ...config,
-          },
-          audio: false,
-        });
-        const recoveryTrack = recoveryStream.getVideoTracks()[0];
-        stream.addTrack(recoveryTrack);
-        recoveryTrack.enabled = videoEnabled;
-        console.log("toggleHD: recovered with old settings");
-        return recoveryTrack;
-      } catch (recoveryError) {
-        console.error("toggleHD: recovery failed:", recoveryError);
-      }
-
-      return null;
-    }
+    const nextHd = !hdEnabled;
+    const track = await replaceVideoInStream({
+      video: {
+        ...(nextHd ? HD_VIDEO : SD_VIDEO),
+        facingMode: { ideal: facingMode },
+        ...(cameraId ? { deviceId: { ideal: cameraId } } : {}),
+      },
+    });
+    if (track) setHdEnabled(nextHd);
+    return track;
   };
 
   const switchCamera = async (): Promise<MediaStreamTrack | null> => {
-    if (!stream) {
-      console.error("switchCamera: stream is null");
-      return null;
+    const nextFacing = facingMode === "user" ? "environment" : "user";
+    const track = await replaceVideoInStream({
+      video: {
+        ...(hdEnabled ? HD_VIDEO : SD_VIDEO),
+        facingMode: { ideal: nextFacing },
+      },
+    });
+    if (track) {
+      setFacingMode(nextFacing);
+      const id = track.getSettings().deviceId;
+      if (id) setCameraId(id);
     }
-
-    const oldVideoTrack = stream.getVideoTracks()[0];
-    if (!oldVideoTrack) {
-      console.error("switchCamera: no video track found");
-      return null;
-    }
-
-    console.log("switchCamera: current facing mode:", facingMode);
-    console.log(
-      "switchCamera: old track settings:",
-      oldVideoTrack.getSettings(),
-    );
-
-    try {
-      const newFacingMode = facingMode === "user" ? "environment" : "user";
-      const config = hdEnabled ? HD_CONFIG : SD_CONFIG;
-
-      console.log(
-        "switchCamera: requesting",
-        newFacingMode,
-        "camera with config:",
-        config,
-      );
-
-      // Stop old track FIRST to release the camera
-      oldVideoTrack.stop();
-
-      // Small delay to ensure camera is released
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Try with 'ideal' first (more lenient)
-      let newStream: MediaStream;
-      try {
-        newStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: newFacingMode },
-            ...config,
-          },
-          audio: false,
-        });
-      } catch (idealError) {
-        console.log(
-          "switchCamera: 'ideal' failed, trying without facingMode constraint",
-          idealError,
-        );
-        // If ideal fails, try without facingMode (just get any camera)
-        newStream = await navigator.mediaDevices.getUserMedia({
-          video: config,
-          audio: false,
-        });
-      }
-
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      console.log(
-        "switchCamera: new track settings:",
-        newVideoTrack.getSettings(),
-      );
-
-      // Remove old track from stream
-      stream.removeTrack(oldVideoTrack);
-
-      // Add new track
-      stream.addTrack(newVideoTrack);
-      newVideoTrack.enabled = videoEnabled;
-
-      setFacingMode(newFacingMode);
-      return newVideoTrack;
-    } catch (error) {
-      console.error("switchCamera: Error details:", error);
-      if (error instanceof Error) {
-        console.error("switchCamera: Error name:", error.name);
-        console.error("switchCamera: Error message:", error.message);
-      }
-
-      // Try to recover by restarting with old settings
-      try {
-        const config = hdEnabled ? HD_CONFIG : SD_CONFIG;
-        const recoveryStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: facingMode },
-            ...config,
-          },
-          audio: false,
-        });
-        const recoveryTrack = recoveryStream.getVideoTracks()[0];
-        stream.addTrack(recoveryTrack);
-        recoveryTrack.enabled = videoEnabled;
-        console.log("switchCamera: recovered with old settings");
-        return recoveryTrack;
-      } catch (recoveryError) {
-        console.error("switchCamera: recovery failed:", recoveryError);
-      }
-
-      return null;
-    }
+    return track;
   };
+
+  const selectCamera = async (
+    deviceId: string,
+  ): Promise<MediaStreamTrack | null> => {
+    const track = await replaceVideoInStream({
+      video: {
+        ...(hdEnabled ? HD_VIDEO : SD_VIDEO),
+        deviceId: { exact: deviceId },
+      },
+    });
+    if (track) setCameraId(deviceId);
+    return track;
+  };
+
+  const selectMic = async (
+    deviceId: string,
+  ): Promise<MediaStreamTrack | null> => {
+    const track = await replaceAudioInStream(deviceId);
+    if (track) setMicId(deviceId);
+    return track;
+  };
+
+  const selectSpeaker = (deviceId: string) => {
+    setSpeakerId(deviceId);
+  };
+
+  const canSwitchCamera = devices.cameras.length > 1;
 
   return {
     stream,
     audioEnabled,
     videoEnabled,
     hdEnabled,
-    canSwitchCamera,
     facingMode,
+    canSwitchCamera,
+    devices,
+    cameraId,
+    micId,
+    speakerId,
+    mediaError,
     initializeMedia,
     stopMedia,
     toggleAudio,
     toggleVideo,
     toggleHD,
     switchCamera,
-    restartAudio,
-    restartVideo,
+    selectCamera,
+    selectMic,
+    selectSpeaker,
+    refreshDevices,
   };
 };

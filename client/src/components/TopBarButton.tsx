@@ -20,7 +20,9 @@ const TopBarButton = ({
 }: TopBarButtonProps) => {
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-label={title}
       className={cn(
         "animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3 px-2 py-2 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-full text-white transition-all shadow-lg border border-white/10 cursor-pointer",
         text && "px-4",

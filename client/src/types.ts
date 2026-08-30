@@ -1,4 +1,3 @@
-// src/types/stats.ts
 export interface ConnectionStatus {
   ping: number;
   bitrateReceived: number;
@@ -70,4 +69,67 @@ export interface EnhancedConnectionStats {
   quality: QualityStats;
   bandwidth: BandwidthStats;
   callDuration: string;
+}
+
+export type IceUiState =
+  | "new"
+  | "checking"
+  | "connected"
+  | "completed"
+  | "disconnected"
+  | "failed"
+  | "closed";
+
+export type CallPhase =
+  | "lobby"
+  | "waiting"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "peer-left";
+
+export type ChatMessageStatus = "sent" | "queued" | "failed";
+
+export interface MessageReaction {
+  emoji: string;
+  local: boolean;
+  remote: boolean;
+}
+
+export interface ChatTextMessage {
+  kind: "text";
+  id: string;
+  text: string;
+  sentAt: number;
+  from: "local" | "remote";
+  status: ChatMessageStatus;
+  reactions: MessageReaction[];
+}
+
+export interface ChatFileMessage {
+  kind: "file";
+  id: string;
+  name: string;
+  size: number;
+  mime: string;
+  sentAt: number;
+  from: "local" | "remote";
+  status: ChatMessageStatus;
+  progress: number;
+  url?: string;
+  reactions: MessageReaction[];
+}
+
+export type ChatMessage = ChatTextMessage | ChatFileMessage;
+
+export interface CallReaction {
+  id: string;
+  emoji: string;
+  from: "local" | "remote";
+}
+
+export interface MediaDeviceLists {
+  cameras: MediaDeviceInfo[];
+  mics: MediaDeviceInfo[];
+  speakers: MediaDeviceInfo[];
 }

@@ -1,14 +1,27 @@
-// src/hooks/useVideoCall.ts
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSignaling } from "./useSignaling";
 import { useWebRTC } from "./useWebRTC";
 import { useMediaControls } from "./useMediaControls";
-import { iceServers, signalingServer } from "../utils/constants";
+import { usePeerData } from "./usePeerData";
+import { signalingServer, FALLBACK_ICE } from "../utils/constants";
+import { fetchIceServers } from "../utils/ice";
 
 export const useVideoCall = () => {
+  const [iceConfig, setIceConfig] = useState<RTCConfiguration>(FALLBACK_ICE);
   const signaling = useSignaling(signalingServer);
-  const webrtc = useWebRTC(signaling, iceServers);
   const media = useMediaControls();
+  const webrtc = useWebRTC(signaling, iceConfig, media.hdEnabled);
+  const collab = usePeerData(
+    webrtc.peerConnectionRef,
+    webrtc.roleReady,
+    webrtc.polite,
+    webrtc.pcEpoch,
+    webrtc.kickNegotiate,
+  );
+
+  useEffect(() => {
+    void fetchIceServers().then(setIceConfig);
+  }, []);
 
   useEffect(() => {
     if (!webrtc.connected || !media.stream) return;
@@ -16,43 +29,40 @@ export const useVideoCall = () => {
     const video = media.stream.getVideoTracks()[0];
     if (audio) webrtc.notifyPeerAudioToggle(audio.enabled);
     if (video) webrtc.notifyPeerVideoToggle(video.enabled);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [webrtc.connected]);
 
-  const joinRoom = async (roomId: string) => {
-    const stream = await media.initializeMedia();
+  const joinCall = async (roomId: string) => {
+    const stream = media.stream ?? (await media.initializeMedia());
     webrtc.joinRoom(roomId, stream);
-    return stream;
   };
 
-  const leaveRoom = () => {
+  const leaveCall = () => {
     webrtc.leaveRoom();
     media.stopMedia();
+    collab.resetCollab();
   };
 
   const toggleAudio = async () => {
-    media.toggleAudio();
-    if (media.audioEnabled) {
-      webrtc.notifyPeerAudioToggle(false);
+    const enabled = media.toggleAudio();
+    const track = media.stream?.getAudioTracks()[0] ?? null;
+    if (enabled && track) {
+      await webrtc.replaceAudioTrack(track);
     } else {
-      const track = await media.restartAudio();
-      if (track) {
-        await webrtc.replaceAudioTrack(track);
-        webrtc.notifyPeerAudioToggle(true);
-      }
+      await webrtc.replaceAudioTrack(null);
     }
+    webrtc.notifyPeerAudioToggle(enabled);
   };
 
   const toggleVideo = async () => {
-    media.toggleVideo();
-    if (media.videoEnabled) {
-      webrtc.notifyPeerVideoToggle(false);
+    const enabled = media.toggleVideo();
+    const track = media.stream?.getVideoTracks()[0] ?? null;
+    if (enabled && track) {
+      await webrtc.replaceVideoTrack(track);
     } else {
-      const track = await media.restartVideo();
-      if (track) {
-        await webrtc.replaceVideoTrack(track);
-        webrtc.notifyPeerVideoToggle(true);
-      }
+      await webrtc.replaceVideoTrack(null);
     }
+    webrtc.notifyPeerVideoToggle(enabled);
   };
 
   const switchCamera = async () => {
@@ -65,30 +75,53 @@ export const useVideoCall = () => {
     if (track) await webrtc.replaceVideoTrack(track);
   };
 
+  const selectCamera = async (deviceId: string) => {
+    const track = await media.selectCamera(deviceId);
+    if (track) await webrtc.replaceVideoTrack(track);
+  };
+
+  const selectMic = async (deviceId: string) => {
+    const track = await media.selectMic(deviceId);
+    if (track) await webrtc.replaceAudioTrack(track);
+  };
+
   return {
-    // Connection
-    connected: webrtc.connected,
     signalingConnected: signaling.connected,
+    connected: webrtc.connected,
     stats: webrtc.stats,
-    // Streams
+    iceState: webrtc.iceState,
+    peerLeft: webrtc.peerLeft,
+    roomError: webrtc.roomError,
+    clearRoomError: webrtc.clearRoomError,
     localStream: media.stream,
     remoteStream: webrtc.remoteStream,
-    // Local state
+    remoteScreenStream: webrtc.remoteScreenStream,
     audioEnabled: media.audioEnabled,
     videoEnabled: media.videoEnabled,
     hdEnabled: media.hdEnabled,
     facingMode: media.facingMode,
     canSwitchCamera: media.canSwitchCamera,
-    // Local controls
+    devices: media.devices,
+    cameraId: media.cameraId,
+    micId: media.micId,
+    speakerId: media.speakerId,
+    mediaError: media.mediaError,
+    remoteAudioEnabled: webrtc.remoteAudioEnabled,
+    remoteVideoEnabled: webrtc.remoteVideoEnabled,
+    remoteScreenSharing: webrtc.remoteScreenSharing,
+    localScreenSharing: webrtc.localScreenSharing,
+    initializeMedia: media.initializeMedia,
+    selectSpeaker: media.selectSpeaker,
     toggleAudio,
     toggleVideo,
     toggleHD,
     switchCamera,
-    // Remote state
-    remoteAudioEnabled: webrtc.remoteAudioEnabled,
-    remoteVideoEnabled: webrtc.remoteVideoEnabled,
-    // Room
-    joinRoom,
-    leaveRoom,
+    selectCamera,
+    selectMic,
+    startScreenShare: webrtc.startScreenShare,
+    stopScreenShare: webrtc.stopScreenShare,
+    joinCall,
+    leaveCall,
+    collab,
   };
 };

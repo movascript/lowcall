@@ -31,10 +31,13 @@ max-port=65535
 # Use fingerprints
 fingerprint
 
-# Use long-term credentials mechanism
+# REST / HMAC credentials (recommended). Set the same secret as TURN_SECRET
+# on the signaling server so GET /ice can mint time-limited credentials:
+#   use-auth-secret
+#   static-auth-secret=YOUR_TURN_SECRET
+#
+# Legacy static user (kept so existing deploys keep working until HMAC is enabled):
 lt-cred-mech
-
-# Static user credentials
 user=$TURN_USER:$TURN_PASSWORD
 
 # Realm

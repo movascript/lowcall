@@ -10,4 +10,14 @@ export default defineConfig({
     tailwindcss(),
     babel({ presets: [reactCompilerPreset()] }),
   ],
+  server: {
+    proxy: {
+      "/socket.io": {
+        target: "http://localhost:3000",
+        ws: true,
+      },
+      "/ice": "http://localhost:3000",
+      "/health": "http://localhost:3000",
+    },
+  },
 });

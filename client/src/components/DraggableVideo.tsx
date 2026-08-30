@@ -1,4 +1,3 @@
-// src/components/DraggableVideo.tsx
 import { useEffect, useRef, useState } from "react";
 import { CameraOff, MicOff } from "lucide-react";
 import { cn } from "../utils/classname";
@@ -8,7 +7,10 @@ interface DraggableVideoProps {
   videoEnabled: boolean;
   audioEnabled: boolean;
   connected: boolean;
-  facingMode: "user" | "environment";
+  facingMode?: "user" | "environment";
+  mirror?: boolean;
+  className?: string;
+  corner?: "right" | "left";
 }
 
 export function DraggableVideo({
@@ -16,7 +18,10 @@ export function DraggableVideo({
   videoEnabled,
   audioEnabled,
   connected,
-  facingMode,
+  facingMode = "user",
+  mirror,
+  className,
+  corner = "right",
 }: DraggableVideoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -25,8 +30,8 @@ export function DraggableVideo({
   const [initialized, setInitialized] = useState(false);
 
   const PADDING = 20;
+  const shouldMirror = mirror ?? facingMode === "user";
 
-  // Helper function to get constrained position
   const getConstrainedPosition = (x: number, y: number) => {
     if (!containerRef.current) return { x, y };
 
@@ -47,10 +52,8 @@ export function DraggableVideo({
     };
   };
 
-  // Initialize position to bottom-right when connected
   useEffect(() => {
     if (connected && !initialized && containerRef.current) {
-      // Wait for CSS transition to complete (500ms) plus buffer
       const timer = setTimeout(() => {
         if (!containerRef.current) return;
 
@@ -62,24 +65,27 @@ export function DraggableVideo({
           const containerHeight = containerRef.current.offsetHeight;
 
           const newPosition = {
-            x: parentWidth - containerWidth - PADDING,
+            x:
+              corner === "right"
+                ? parentWidth - containerWidth - PADDING
+                : PADDING,
             y: parentHeight - containerHeight - PADDING,
           };
 
           setPosition(getConstrainedPosition(newPosition.x, newPosition.y));
           setInitialized(true);
         }
-      }, 550); // Match CSS transition duration (500ms) + 50ms buffer
+      }, 550);
 
       return () => clearTimeout(timer);
     } else if (!connected) {
+      // Reset PiP placement when the remote video goes away.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setInitialized(false);
-      setPosition({ x: 0, y: 0 }); // Reset position when disconnected
+      setPosition({ x: 0, y: 0 });
     }
-  }, [connected, initialized]);
+  }, [connected, initialized, corner]);
 
-  // Handle window resize
   useEffect(() => {
     if (!connected || !initialized) return;
 
@@ -164,10 +170,10 @@ export function DraggableVideo({
       className={cn(
         "absolute rounded-2xl overflow-hidden shadow-2xl transition-all duration-400 ease-out z-20",
         connected
-          ? "w-30 sm:w-40 md:w-55 lg:w-72 cursor-grab"
-          : "w-[85%] max-w-xl max-h-7/10 top-[52%] left-1/2 -translate-x-1/2 -translate-y-1/2",
-
+          ? "w-28 sm:w-40 md:w-52 lg:w-72 cursor-grab"
+          : "w-[85%] max-w-xl max-h-[70%] top-[52%] left-1/2 -translate-x-1/2 -translate-y-1/2",
         isDragging && "cursor-grabbing scale-105 transition-none",
+        className,
       )}
       style={
         connected && initialized
@@ -178,10 +184,10 @@ export function DraggableVideo({
             }
           : connected
             ? {
-                // Temporarily keep centered during initialization
-                left: "50%",
-                top: "50%",
-                transform: "translate(-50%, -50%)",
+                left: corner === "right" ? "auto" : "20px",
+                right: corner === "right" ? "20px" : "auto",
+                bottom: "20px",
+                top: "auto",
               }
             : undefined
       }
@@ -196,8 +202,8 @@ export function DraggableVideo({
         disablePictureInPicture
         disableRemotePlayback
         className={cn(
-          "w-full h-full object-",
-          facingMode === "user" && "scale-x-[-1]",
+          "w-full h-full object-cover",
+          shouldMirror && "scale-x-[-1]",
         )}
       />
       {!videoEnabled && (

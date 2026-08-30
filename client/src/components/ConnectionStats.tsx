@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Activity, X, Bug } from "lucide-react";
 import { cn } from "../utils/classname";
 import type { EnhancedConnectionStats } from "../types";
-import { formatBytes } from "../utils/helper";
+import { formatBitrate, formatBytes } from "../utils/helper";
 import TopBarButton from "./TopBarButton";
 
 interface ConnectionStatsProps {
@@ -117,11 +117,11 @@ export function ConnectionStats({
               />
               <StatItem
                 label="Send Bitrate"
-                value={`${formatBytes(stats.connection.bitrateSent)}/s`}
+                value={`${formatBitrate(stats.connection.bitrateSent)}`}
               />
               <StatItem
                 label="Receive Bitrate"
-                value={`${formatBytes(stats.connection.bitrateReceived)}/s`}
+                value={`${formatBitrate(stats.connection.bitrateReceived)}`}
               />
               <StatItem
                 label="Sent"
@@ -143,7 +143,7 @@ export function ConnectionStats({
               />
             </div>
           ) : (
-            <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
+            <div className="max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-2 p-2 pt-0 gap-2">
                 <StatItem
                   label="Status"
@@ -162,11 +162,11 @@ export function ConnectionStats({
                 />
                 <StatItem
                   label="Send Bitrate"
-                  value={`${formatBytes(stats.connection.bitrateSent)}/s`}
+                  value={formatBitrate(stats.connection.bitrateSent)}
                 />
                 <StatItem
                   label="Receive Bitrate"
-                  value={`${formatBytes(stats.connection.bitrateReceived)}/s`}
+                  value={formatBitrate(stats.connection.bitrateReceived)}
                 />
                 <StatItem
                   label="Sent"
@@ -283,12 +283,12 @@ export function ConnectionStats({
                 </div>
                 <StatItem
                   label="Available Out"
-                  value={`${formatBytes(stats.bandwidth.availableOutgoingBitrate)}/s`}
+                  value={formatBitrate(stats.bandwidth.availableOutgoingBitrate)}
                   valueClassName="text-xs"
                 />
                 <StatItem
                   label="Available In"
-                  value={`${formatBytes(stats.bandwidth.availableIncomingBitrate)}/s`}
+                  value={formatBitrate(stats.bandwidth.availableIncomingBitrate)}
                   valueClassName="text-xs"
                 />
 
