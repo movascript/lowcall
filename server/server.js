@@ -6,17 +6,9 @@ const socketIO = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 
-const CLIENT_ORIGINS = (
-  process.env.CLIENT_ORIGIN ||
-  "https://lowcall.ir,http://localhost:5173,http://localhost:4173"
-)
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-
 const io = socketIO(server, {
   cors: {
-    origin: CLIENT_ORIGINS,
+    origin: "*",
     methods: ["GET", "POST"],
   },
   pingTimeout: 10000,
