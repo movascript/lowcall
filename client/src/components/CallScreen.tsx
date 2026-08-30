@@ -255,7 +255,7 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
           </div>
 
           <div>
-            {connected && canSwitchCamera && (
+            {canSwitchCamera && (
               <TopBarButton
                 onClick={() => void switchCamera()}
                 Icon={SwitchCamera}

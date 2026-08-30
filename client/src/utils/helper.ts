@@ -56,3 +56,64 @@ export function log(...args: unknown[]) {
     console.log(...args);
   }
 }
+
+export function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
+export function cameraFacing(
+  device: Pick<MediaDeviceInfo, "label">,
+): "user" | "environment" | null {
+  const label = device.label.toLowerCase();
+  if (/(front|user|face)/.test(label)) return "user";
+  if (/(back|rear|environment|world)/.test(label)) return "environment";
+  return null;
+}
+
+export function facingFromTrack(
+  track: MediaStreamTrack,
+): "user" | "environment" {
+  const facing = track.getSettings().facingMode;
+  if (facing === "user" || facing === "environment") return facing;
+  return cameraFacing({ label: track.label }) ?? "user";
+}
+
+export function preferredCameras(
+  cameras: MediaDeviceInfo[],
+  activeId?: string,
+): MediaDeviceInfo[] {
+  const usable = cameras.filter((c) => c.deviceId && c.deviceId !== "default");
+  if (usable.length <= 2) return usable;
+
+  const front = usable.find((c) => cameraFacing(c) === "user");
+  const back = usable.find((c) => cameraFacing(c) === "environment");
+  const list = front && back ? [front, back] : usable;
+
+  if (activeId && !list.some((c) => c.deviceId === activeId)) {
+    const active = usable.find((c) => c.deviceId === activeId);
+    if (active) {
+      const facing = cameraFacing(active);
+      const idx = facing
+        ? list.findIndex((c) => cameraFacing(c) === facing)
+        : -1;
+      if (idx >= 0) {
+        const next = [...list];
+        next[idx] = active;
+        return next;
+      }
+      return [active, ...list];
+    }
+  }
+  return list;
+}
+
+export function friendlyCameraLabel(
+  device: MediaDeviceInfo,
+  index: number,
+): string {
+  const facing = cameraFacing(device);
+  if (facing === "user") return "Front camera";
+  if (facing === "environment") return "Back camera";
+  return device.label || `Camera ${index + 1}`;
+}

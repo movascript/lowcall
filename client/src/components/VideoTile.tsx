@@ -50,7 +50,21 @@ export const VideoTile = memo(function VideoTile({
   const PADDING = 16;
 
   useEffect(() => {
-    if (videoRef.current) videoRef.current.srcObject = stream;
+    const el = videoRef.current;
+    if (!el) return;
+    el.srcObject = stream;
+    if (stream) void el.play().catch(() => {});
+    if (!stream) return;
+    const refresh = () => {
+      el.srcObject = stream;
+      void el.play().catch(() => {});
+    };
+    stream.addEventListener("addtrack", refresh);
+    stream.addEventListener("removetrack", refresh);
+    return () => {
+      stream.removeEventListener("addtrack", refresh);
+      stream.removeEventListener("removetrack", refresh);
+    };
   }, [stream]);
 
   useEffect(() => {
@@ -77,7 +91,8 @@ export const VideoTile = memo(function VideoTile({
       setPlaced(false);
       return;
     }
-    const timer = window.setTimeout(() => {
+    let raf = 0;
+    const snap = () => {
       const node = containerRef.current;
       const parent = node?.parentElement;
       if (!node || !parent) return;
@@ -92,8 +107,11 @@ export const VideoTile = memo(function VideoTile({
         pipIndex * (node.offsetHeight + 12);
       setPosition(constrain(x, y));
       setPlaced(true);
-    }, 40);
-    return () => window.clearTimeout(timer);
+    };
+    raf = requestAnimationFrame(() => {
+      raf = requestAnimationFrame(snap);
+    });
+    return () => cancelAnimationFrame(raf);
   }, [spotlight, pipCorner, pipIndex, constrain]);
 
   useEffect(() => {
@@ -166,11 +184,14 @@ export const VideoTile = memo(function VideoTile({
     <div
       ref={containerRef}
       className={cn(
-        "overflow-hidden bg-black isolate [contain:paint]",
+        "overflow-hidden bg-black isolate contain-[paint]",
         spotlight
           ? "absolute inset-0 z-video rounded-none"
           : cn(
-              "absolute z-tile aspect-video w-28 sm:w-40 md:w-52 lg:w-64 rounded-2xl shadow-2xl ring-1 ring-white/20 cursor-grab",
+              "absolute z-tile rounded-2xl shadow-2xl ring-1 ring-white/20 cursor-grab",
+              fit === "contain"
+                ? "aspect-video w-28 sm:w-40 md:w-52 lg:w-64"
+                : "aspect-3/4 w-27 sm:aspect-video sm:w-40 md:w-52 lg:w-64",
               dragging && "cursor-grabbing scale-[1.03] shadow-[0_20px_50px_rgba(0,0,0,0.5)]",
             ),
       )}

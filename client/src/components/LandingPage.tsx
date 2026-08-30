@@ -1,18 +1,16 @@
-import { ArrowRight, Plus, Link2 } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { cn } from "../utils/classname";
 
 interface LandingPageProps {
   roomId: string;
   setRoomId: (id: string) => void;
   onJoin: () => void;
-  onCreate: () => void;
 }
 
 const LandingPage = ({
   roomId,
   setRoomId,
   onJoin,
-  onCreate,
 }: LandingPageProps) => {
   return (
     <div className="flex items-center justify-center h-full p-6">
@@ -38,7 +36,7 @@ const LandingPage = ({
             placeholder="Enter room code"
             value={roomId}
             onChange={(e) => setRoomId(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && onJoin()}
+            onKeyDown={(e) => e.key === "Enter" && roomId.trim() && onJoin()}
             className="w-full px-4 py-3.5 text-base border-2 border-border rounded-xl outline-none transition-all focus:border-primary"
             autoFocus
             aria-label="Room code"
@@ -54,21 +52,9 @@ const LandingPage = ({
                 : "opacity-50 cursor-not-allowed",
             )}
           >
-            Join Room
+            Continue
             <ArrowRight className="size-5" />
           </button>
-          <button
-            type="button"
-            onClick={onCreate}
-            className="flex justify-center items-center gap-2 w-full py-3 text-sm font-medium text-foreground bg-secondary rounded-xl hover:bg-muted transition-colors"
-          >
-            <Plus className="size-4" />
-            Create a room
-          </button>
-          <p className="text-[11px] text-center text-muted-foreground flex items-center justify-center gap-1">
-            <Link2 className="size-3" />
-            Share the link after you join
-          </p>
         </div>
       </div>
     </div>

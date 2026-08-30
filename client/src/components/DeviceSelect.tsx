@@ -8,6 +8,7 @@ interface DeviceSelectProps {
   options: MediaDeviceInfo[];
   onChange: (deviceId: string) => void;
   empty?: string;
+  getLabel?: (device: MediaDeviceInfo, index: number) => string;
 }
 
 export function DeviceSelect({
@@ -17,6 +18,7 @@ export function DeviceSelect({
   options,
   onChange,
   empty = "No devices",
+  getLabel,
 }: DeviceSelectProps) {
   return (
     <fieldset className="text-left min-w-0 w-full">
@@ -34,13 +36,15 @@ export function DeviceSelect({
         >
           {options.map((device, i) => {
             const selected = device.deviceId === value;
+            const name =
+              getLabel?.(device, i) || device.label || `${label} ${i + 1}`;
             return (
               <button
                 key={device.deviceId || i}
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                title={device.label || `${label} ${i + 1}`}
+                title={name}
                 onClick={() => onChange(device.deviceId)}
                 className={cn(
                   "flex items-center justify-between gap-2 w-full min-w-0 max-w-full text-left px-3 py-2.5 rounded-2xl text-sm transition-all border backdrop-blur-md overflow-hidden",
@@ -49,9 +53,7 @@ export function DeviceSelect({
                     : "bg-white/50 border-transparent hover:bg-white/80 text-foreground/80",
                 )}
               >
-                <span className="min-w-0 flex-1 truncate">
-                  {device.label || `${label} ${i + 1}`}
-                </span>
+                <span className="min-w-0 flex-1 truncate">{name}</span>
                 {selected && (
                   <Check className="size-4 shrink-0 text-foreground" />
                 )}

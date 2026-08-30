@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import "./App.css";
 import LandingPage from "./components/LandingPage";
 import { RoomPage } from "./components/RoomPage";
-import { normalizeRoomId, randomRoomId } from "./utils/helper";
+import { normalizeRoomId } from "./utils/helper";
 
 function Home() {
   const [roomId, setRoomId] = useState("");
@@ -20,7 +20,6 @@ function Home() {
         roomId={roomId}
         setRoomId={setRoomId}
         onJoin={() => go(roomId)}
-        onCreate={() => go(randomRoomId())}
       />
     </div>
   );

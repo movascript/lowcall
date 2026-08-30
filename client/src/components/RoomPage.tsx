@@ -73,8 +73,11 @@ export function RoomPage() {
           speakerId={call.speakerId}
           audioEnabled={call.audioEnabled}
           videoEnabled={call.videoEnabled}
+          facingMode={call.facingMode}
+          canSwitchCamera={call.canSwitchCamera}
           onToggleAudio={() => void call.toggleAudio()}
           onToggleVideo={() => void call.toggleVideo()}
+          onSwitchCamera={() => void call.switchCamera()}
           onSelectCamera={(id) => void call.selectCamera(id)}
           onSelectMic={(id) => void call.selectMic(id)}
           onSelectSpeaker={call.selectSpeaker}

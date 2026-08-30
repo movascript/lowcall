@@ -1,8 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Copy, Check, Mic, Video } from "lucide-react";
+import {
+  ArrowRight,
+  Copy,
+  Check,
+  Mic,
+  Video,
+  ChevronDown,
+  SwitchCamera,
+} from "lucide-react";
 import { DeviceSelect } from "./DeviceSelect";
 import { cn } from "../utils/classname";
-import { roomUrl } from "../utils/helper";
+import {
+  friendlyCameraLabel,
+  preferredCameras,
+  roomUrl,
+} from "../utils/helper";
 import type { MediaDeviceLists } from "../types";
 import { Spinner } from "../ui/Spinner";
 
@@ -16,8 +28,11 @@ interface LobbyProps {
   speakerId: string;
   audioEnabled: boolean;
   videoEnabled: boolean;
+  facingMode: "user" | "environment";
+  canSwitchCamera: boolean;
   onToggleAudio: () => void;
   onToggleVideo: () => void;
+  onSwitchCamera: () => void;
   onSelectCamera: (id: string) => void;
   onSelectMic: (id: string) => void;
   onSelectSpeaker: (id: string) => void;
@@ -36,8 +51,11 @@ export function Lobby({
   speakerId,
   audioEnabled,
   videoEnabled,
+  facingMode,
+  canSwitchCamera,
   onToggleAudio,
   onToggleVideo,
+  onSwitchCamera,
   onSelectCamera,
   onSelectMic,
   onSelectSpeaker,
@@ -49,7 +67,10 @@ export function Lobby({
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (videoRef.current) videoRef.current.srcObject = stream;
+    const el = videoRef.current;
+    if (!el) return;
+    el.srcObject = stream;
+    if (stream) void el.play().catch(() => {});
   }, [stream]);
 
   const copyLink = async () => {
@@ -61,6 +82,8 @@ export function Lobby({
       // ignore
     }
   };
+
+  const cameras = preferredCameras(devices.cameras, cameraId);
 
   return (
     <div className="h-full overflow-y-auto overscroll-contain p-4 sm:p-6">
@@ -84,14 +107,15 @@ export function Lobby({
           </button>
         </div>
 
-        <div className="relative aspect-video rounded-3xl overflow-hidden isolate [contain:paint] bg-black mb-4 ring-1 ring-black/5 [clip-path:inset(0_round_1.5rem)]">
+        <div className="relative aspect-video max-sm:aspect-3/4 rounded-3xl overflow-hidden isolate contain-[paint] bg-black mb-4 ring-1 ring-black/5 [clip-path:inset(0_round_1.5rem)]">
           <video
             ref={videoRef}
             autoPlay
             muted
             playsInline
             className={cn(
-              "w-full h-full object-cover -scale-x-100",
+              "w-full h-full object-cover",
+              facingMode === "user" && "-scale-x-100",
               !videoEnabled && "opacity-0",
             )}
           />
@@ -99,6 +123,16 @@ export function Lobby({
             <div className="absolute inset-0 flex items-center justify-center text-white/70">
               Camera off
             </div>
+          )}
+          {canSwitchCamera && videoEnabled && !mediaError && (
+            <button
+              type="button"
+              onClick={onSwitchCamera}
+              aria-label="Switch camera"
+              className="absolute bottom-3 right-3 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/70"
+            >
+              <SwitchCamera size={18} />
+            </button>
           )}
           {mediaError && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 text-white p-4 text-center">
@@ -139,31 +173,38 @@ export function Lobby({
           </button>
         </div>
 
-        <div className="space-y-3 mb-5">
-          <DeviceSelect
-            id="camera"
-            label="Camera"
-            value={cameraId}
-            options={devices.cameras}
-            onChange={onSelectCamera}
-          />
-          <DeviceSelect
-            id="mic"
-            label="Microphone"
-            value={micId}
-            options={devices.mics}
-            onChange={onSelectMic}
-          />
-          {devices.speakers.length > 0 && (
+        <details className="group mb-5 rounded-2xl border border-border/70 bg-secondary/50">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-foreground select-none [&::-webkit-details-marker]:hidden">
+            Camera, mic & speaker
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="space-y-3 px-4 pb-4">
             <DeviceSelect
-              id="speaker"
-              label="Speaker"
-              value={speakerId}
-              options={devices.speakers}
-              onChange={onSelectSpeaker}
+              id="camera"
+              label="Camera"
+              value={cameraId}
+              options={cameras}
+              onChange={onSelectCamera}
+              getLabel={friendlyCameraLabel}
             />
-          )}
-        </div>
+            <DeviceSelect
+              id="mic"
+              label="Microphone"
+              value={micId}
+              options={devices.mics}
+              onChange={onSelectMic}
+            />
+            {devices.speakers.length > 0 && (
+              <DeviceSelect
+                id="speaker"
+                label="Speaker"
+                value={speakerId}
+                options={devices.speakers}
+                onChange={onSelectSpeaker}
+              />
+            )}
+          </div>
+        </details>
 
         <button
           type="button"

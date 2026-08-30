@@ -13,6 +13,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { REACTION_EMOJIS } from "../utils/constants";
+import { isMobileDevice } from "../utils/helper";
 
 interface ControlBarProps {
   audioEnabled: boolean;
@@ -50,6 +51,7 @@ const ControlBar = ({
   onLeave,
 }: ControlBarProps) => {
   const trayRef = useRef<HTMLDivElement>(null);
+  const showScreenShare = !isMobileDevice();
 
   useEffect(() => {
     if (!reactionOpen) return;
@@ -64,7 +66,7 @@ const ControlBar = ({
   }, [reactionOpen, onToggleReactions]);
 
   return (
-    <div className="relative z-floating flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-6 py-3 sm:py-4 bg-black/70 backdrop-blur-xl border-t border-white/10 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className="relative z-floating flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-6 py-3 sm:py-4 bg-black/70 backdrop-blur-xl border-t border-white/10 pb-[max(0.75rem,env(safe-area-inset-bottom))] overflow-x-auto min-w-0">
       {reactionOpen && (
         <div
           ref={trayRef}
@@ -102,13 +104,15 @@ const ControlBar = ({
         active={videoEnabled}
         label={videoEnabled ? "Turn camera off" : "Turn camera on"}
       />
-      <ControlButton
-        icon={localScreenSharing ? MonitorX : MonitorUp}
-        onClick={onToggleScreen}
-        active={!localScreenSharing}
-        variant={localScreenSharing ? "primary" : "default"}
-        label={localScreenSharing ? "Stop sharing screen" : "Share screen"}
-      />
+      {showScreenShare && (
+        <ControlButton
+          icon={localScreenSharing ? MonitorX : MonitorUp}
+          onClick={onToggleScreen}
+          active={!localScreenSharing}
+          variant={localScreenSharing ? "primary" : "default"}
+          label={localScreenSharing ? "Stop sharing screen" : "Share screen"}
+        />
+      )}
       <span data-reaction-toggle>
         <ControlButton
           icon={Smile}

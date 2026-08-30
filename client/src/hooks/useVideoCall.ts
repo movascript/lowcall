@@ -24,6 +24,11 @@ export const useVideoCall = () => {
   }, []);
 
   useEffect(() => {
+    webrtc.syncLocalStream(media.stream);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keep peer connection's local tracks in sync after camera/mic swaps
+  }, [media.stream]);
+
+  useEffect(() => {
     if (!webrtc.connected || !media.stream) return;
     const audio = media.stream.getAudioTracks()[0];
     const video = media.stream.getVideoTracks()[0];

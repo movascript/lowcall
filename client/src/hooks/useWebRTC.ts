@@ -435,6 +435,10 @@ export const useWebRTC = (
     screenTrackRef.current = null;
   }
 
+  const syncLocalStream = (stream: MediaStream | null) => {
+    localStreamRef.current = stream;
+  };
+
   const joinRoom = (roomId: string, stream: MediaStream) => {
     localStreamRef.current = stream;
     currentRoomRef.current = roomId;
@@ -535,6 +539,7 @@ export const useWebRTC = (
     peerConnectionRef: peerConnectionRef as RefObject<RTCPeerConnection | null>,
     joinRoom,
     leaveRoom,
+    syncLocalStream,
     replaceVideoTrack,
     replaceAudioTrack,
     startScreenShare,
