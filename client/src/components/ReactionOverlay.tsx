@@ -1,14 +1,19 @@
+import { memo } from "react";
 import type { CallReaction } from "../types";
 
-export function ReactionOverlay({ reactions }: { reactions: CallReaction[] }) {
+export const ReactionOverlay = memo(function ReactionOverlay({
+  reactions,
+}: {
+  reactions: CallReaction[];
+}) {
   return (
     <div className="pointer-events-none fixed inset-0 z-reaction overflow-hidden">
-      {reactions.map((reaction, i) => (
+      {reactions.map((reaction) => (
         <span
           key={reaction.id}
-          className="absolute text-4xl sm:text-5xl reaction-rise drop-shadow-lg"
+          className="absolute text-4xl sm:text-5xl reaction-rise"
           style={{
-            left: `${18 + ((i * 17) % 64)}%`,
+            left: `${reaction.x}%`,
             bottom: "5.5rem",
           }}
         >
@@ -17,4 +22,4 @@ export function ReactionOverlay({ reactions }: { reactions: CallReaction[] }) {
       ))}
     </div>
   );
-}
+});

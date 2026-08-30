@@ -261,7 +261,11 @@ export function usePeerData(
 
   function pushCallReaction(emoji: string, from: "local" | "remote") {
     const id = crypto.randomUUID();
-    setCallReactions((prev) => [...prev, { id, emoji, from }]);
+    const x = 10 + Math.random() * 72;
+    setCallReactions((prev) => {
+      const next = [...prev, { id, emoji, from, x }];
+      return next.length > 10 ? next.slice(next.length - 10) : next;
+    });
     window.setTimeout(() => {
       setCallReactions((prev) => prev.filter((r) => r.id !== id));
     }, 2200);

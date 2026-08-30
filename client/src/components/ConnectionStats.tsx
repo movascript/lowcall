@@ -66,9 +66,9 @@ export function ConnectionStats({
       ) : (
         <div
           ref={ref}
-          className="absolute left-0 top-12 z-tooltip w-[min(calc(100vw-2rem),20rem)] max-h-[min(70vh,32rem)] overflow-y-auto overflow-x-hidden bg-black/70 backdrop-blur-md border border-white/10 rounded-2xl p-3 shadow-2xl animate-in fade-in slide-in-from-top-4"
+          className="absolute left-0 top-12 z-tooltip flex flex-col w-[min(calc(100vw-2rem),20rem)] max-h-[min(70vh,32rem)] overflow-hidden bg-black/70 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl animate-in fade-in slide-in-from-top-4"
         >
-          <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-3">
+          <div className="flex justify-between items-center border-b border-white/10 px-3 py-2 shrink-0">
             <span className="text-white px-2 font-medium text-sm flex items-center gap-2">
               <Activity size={16} /> Connection Info
               <span className="mx-1">•</span>
@@ -99,7 +99,7 @@ export function ConnectionStats({
           </div>
 
           {!debugMode ? (
-            <div className="grid grid-cols-2 p-2 pt-0 gap-2">
+            <div className="grid grid-cols-2 p-3 pt-2 gap-2 overflow-y-auto min-h-0 flex-1">
               <StatItem
                 label="Status"
                 value={stats.connection.candidateType}
@@ -143,8 +143,7 @@ export function ConnectionStats({
               />
             </div>
           ) : (
-            <div className="max-h-[70vh] overflow-y-auto">
-              <div className="grid grid-cols-2 p-2 pt-0 gap-2">
+            <div className="grid grid-cols-2 p-3 pt-2 gap-2 overflow-y-auto min-h-0 flex-1">
                 <StatItem
                   label="Status"
                   value={stats.connection.candidateType}
@@ -316,7 +315,6 @@ export function ConnectionStats({
                   valueClassName="text-xs"
                 />
               </div>
-            </div>
           )}
         </div>
       )}

@@ -126,6 +126,7 @@ export interface CallReaction {
   id: string;
   emoji: string;
   from: "local" | "remote";
+  x: number;
 }
 
 export interface MediaDeviceLists {

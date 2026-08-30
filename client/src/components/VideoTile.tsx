@@ -166,7 +166,7 @@ export const VideoTile = memo(function VideoTile({
     <div
       ref={containerRef}
       className={cn(
-        "overflow-hidden bg-black",
+        "overflow-hidden bg-black isolate [contain:paint]",
         spotlight
           ? "absolute inset-0 z-video rounded-none"
           : cn(
@@ -202,19 +202,26 @@ export const VideoTile = memo(function VideoTile({
             }
       }
     >
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted={muted}
-        disablePictureInPicture
-        disableRemotePlayback
-        className={cn(
-          "w-full h-full",
-          fit === "contain" ? "object-contain" : "object-cover",
-          mirror && "scale-x-[-1]",
-        )}
-      />
+      <div
+        className="absolute inset-0 overflow-hidden rounded-[inherit] [transform:translateZ(0)]"
+        style={{
+          clipPath: spotlight ? "inset(0)" : "inset(0 round 1rem)",
+        }}
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={muted}
+          disablePictureInPicture
+          disableRemotePlayback
+          className={cn(
+            "h-full w-full",
+            fit === "contain" ? "object-contain" : "object-cover",
+            mirror && "-scale-x-100",
+          )}
+        />
+      </div>
       {!videoEnabled && (
         <div className="absolute inset-0 bg-zinc-900/95 flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
           <CameraOff

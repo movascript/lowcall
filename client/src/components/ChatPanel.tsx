@@ -56,7 +56,7 @@ export function ChatPanel({
   return (
     <aside
       className={cn(
-        "z-modal flex flex-col pointer-events-auto",
+        "z-modal flex flex-col pointer-events-auto min-w-0 overflow-x-hidden",
         expanded
           ? "absolute inset-0 bg-black/75 backdrop-blur-xl"
           : "absolute inset-x-0 bottom-0 h-[33%] bg-black/55 backdrop-blur-xl border-t border-white/10 sm:inset-auto sm:right-4 sm:bottom-4 sm:h-auto sm:w-80 sm:max-h-[46%] sm:bg-transparent sm:backdrop-blur-none sm:border-0 sm:pointer-events-none",
@@ -100,7 +100,7 @@ export function ChatPanel({
       <div
         ref={listRef}
         className={cn(
-          "flex-1 overflow-y-auto px-3 space-y-2 sm:pointer-events-auto",
+          "flex-1 overflow-y-auto overflow-x-hidden px-3 space-y-2 min-w-0 sm:pointer-events-auto",
           hud && "sm:px-0 sm:flex sm:flex-col sm:justify-end",
         )}
       >
@@ -182,7 +182,7 @@ export function ChatPanel({
                 submit();
               }
             }}
-            className="flex-1 resize-none rounded-2xl bg-white/10 sm:bg-transparent text-white px-3 py-2 text-sm outline-none placeholder:text-white/40 max-h-24"
+            className="flex-1 min-w-0 resize-none rounded-2xl bg-white/10 sm:bg-transparent text-white px-3 py-2 text-sm outline-none placeholder:text-white/40 max-h-24"
           />
           <button
             type="button"
@@ -221,7 +221,8 @@ function ChatBubble({
   return (
     <div
       className={cn(
-        "flex flex-col max-w-[90%]",
+        "flex flex-col min-w-0 max-w-[90%]",
+        message.kind === "file" && "w-[90%]",
         mine ? "ml-auto items-end" : "mr-auto items-start",
       )}
     >
@@ -229,7 +230,8 @@ function ChatBubble({
         type="button"
         onClick={onToggleReact}
         className={cn(
-          "text-left rounded-2xl px-3 py-2 text-sm text-white",
+          "text-left rounded-2xl px-3 py-2 text-sm text-white min-w-0 overflow-hidden",
+          message.kind === "file" ? "w-full" : "w-max max-w-full",
           glass
             ? mine
               ? "bg-primary/70 backdrop-blur-md border border-white/10 text-primary-foreground"
@@ -240,9 +242,9 @@ function ChatBubble({
         )}
       >
         {message.kind === "text" ? (
-          <p className="whitespace-pre-wrap break-words">{message.text}</p>
+            <p className="whitespace-pre-wrap wrap-anywhere">{message.text}</p>
         ) : (
-          <div className="min-w-36">
+          <div className="min-w-0 w-full max-w-full overflow-hidden">
             <p className="font-medium truncate">{message.name}</p>
             <p className="text-xs opacity-80">
               {formatBytes(message.size)}
@@ -263,7 +265,7 @@ function ChatBubble({
                 href={message.url}
                 download={message.name}
                 onClick={(e) => e.stopPropagation()}
-                className="mt-1 inline-flex items-center gap-1 text-xs underline"
+                className="mt-1 inline-flex items-center gap-1 text-xs underline max-w-full min-w-0"
               >
                 <Download size={12} /> Save
               </a>

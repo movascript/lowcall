@@ -148,19 +148,21 @@
 
 @keyframes reaction-rise {
   0% {
-    transform: translateY(0) scale(0.7);
+    transform: translate3d(0, 0, 0) scale(0.7);
     opacity: 0;
   }
   14% {
-    transform: translateY(-6dvh) scale(1);
+    transform: translate3d(0, -6dvh, 0) scale(1);
     opacity: 1;
   }
   100% {
-    transform: translateY(-78dvh) scale(1.2);
+    transform: translate3d(0, -78dvh, 0) scale(1.15);
     opacity: 0;
   }
 }
 
 .reaction-rise {
   animation: reaction-rise 2.2s ease-out forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }

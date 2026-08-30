@@ -63,17 +63,20 @@ export function Lobby({
   };
 
   return (
-    <div className="flex items-center justify-center h-full p-4 sm:p-6 overflow-y-auto">
-      <div className="bg-card/90 backdrop-blur-xl rounded-3xl p-5 sm:p-6 shadow-2xl max-w-lg w-full animate-in fade-in-50 border border-white/40">
-        <div className="flex items-center justify-between mb-4">
-          <div>
+    <div className="h-full overflow-y-auto overscroll-contain p-4 sm:p-6">
+      <div className="min-h-full flex flex-col justify-start sm:justify-center">
+        <div className="bg-card/90 backdrop-blur-xl rounded-3xl p-5 sm:p-6 shadow-2xl max-w-lg w-full mx-auto animate-in fade-in-50 border border-white/40 overflow-x-hidden">
+        <div className="flex items-center justify-between gap-2 mb-4 min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-xs text-muted-foreground">Ready to join</p>
-            <h1 className="text-xl font-bold text-foreground">Room {roomId}</h1>
+            <h1 className="text-xl font-bold text-foreground truncate">
+              Room {roomId}
+            </h1>
           </div>
           <button
             type="button"
             onClick={copyLink}
-            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-full bg-secondary hover:bg-muted"
+            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-full bg-secondary hover:bg-muted shrink-0"
             aria-label="Copy room link"
           >
             {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -81,14 +84,14 @@ export function Lobby({
           </button>
         </div>
 
-        <div className="relative aspect-video rounded-3xl overflow-hidden bg-black mb-4 ring-1 ring-black/5">
+        <div className="relative aspect-video rounded-3xl overflow-hidden isolate [contain:paint] bg-black mb-4 ring-1 ring-black/5 [clip-path:inset(0_round_1.5rem)]">
           <video
             ref={videoRef}
             autoPlay
             muted
             playsInline
             className={cn(
-              "w-full h-full object-cover scale-x-[-1]",
+              "w-full h-full object-cover -scale-x-100",
               !videoEnabled && "opacity-0",
             )}
           />
@@ -177,6 +180,7 @@ export function Lobby({
             </>
           )}
         </button>
+        </div>
       </div>
     </div>
   );
