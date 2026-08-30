@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import {
-  CameraOff,
   MicOff,
   SwitchCamera,
   Server,
@@ -8,9 +7,8 @@ import {
   Check,
   MonitorX,
 } from "lucide-react";
-import { DraggableVideo } from "./DraggableVideo";
+import { VideoTile, type VideoTileId } from "./VideoTile";
 import { ConnectionStats } from "./ConnectionStats";
-import { cn } from "../utils/classname";
 import ControlBar from "./ControlBar";
 import { Spinner } from "../ui/Spinner";
 import TopBarButton from "./TopBarButton";
@@ -19,6 +17,7 @@ import { ChatPanel } from "./ChatPanel";
 import { ReactionOverlay } from "./ReactionOverlay";
 import { CallBanner } from "./CallBanner";
 import { roomUrl } from "../utils/helper";
+import { useCallSounds } from "../hooks/useCallSounds";
 import type { useVideoCall } from "../hooks/useVideoCall";
 
 type Call = ReturnType<typeof useVideoCall>;
@@ -34,11 +33,7 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
   const [reactionOpen, setReactionOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [screenError, setScreenError] = useState<string | null>(null);
-
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteScreenRef = useRef<HTMLVideoElement>(null);
-  const remoteCameraPipRef = useRef<HTMLVideoElement>(null);
+  const [pinned, setPinned] = useState<VideoTileId | null>(null);
 
   const {
     connected,
@@ -70,6 +65,20 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
 
   const showScreen =
     remoteScreenSharing && Boolean(remoteScreenStream?.getVideoTracks().length);
+
+  useCallSounds({ connected, messages: collab.messages });
+
+  const defaultSpotlight: VideoTileId = !connected
+    ? "local"
+    : showScreen
+      ? "screen"
+      : "remote";
+  const pinnedValid =
+    pinned === "local" ||
+    (pinned === "remote" && connected) ||
+    (pinned === "screen" && showScreen);
+  const spotlight: VideoTileId = pinnedValid && pinned ? pinned : defaultSpotlight;
+
   const reconnecting =
     connected === false &&
     (iceState === "disconnected" || iceState === "failed") &&
@@ -78,37 +87,7 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
     stats.quality.qualityLimitationReason === "bandwidth" ||
     stats.connection.packetLoss >= 8;
 
-  useEffect(() => {
-    if (localStream && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStream;
-    }
-  }, [localStream]);
-
-  useEffect(() => {
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStream || null;
-    }
-    if (remoteCameraPipRef.current) {
-      remoteCameraPipRef.current.srcObject = remoteStream || null;
-    }
-  }, [remoteStream]);
-
-  useEffect(() => {
-    if (remoteScreenRef.current) {
-      remoteScreenRef.current.srcObject = remoteScreenStream || null;
-    }
-  }, [remoteScreenStream]);
-
-  useEffect(() => {
-    const el = remoteVideoRef.current as
-      | (HTMLVideoElement & { setSinkId?: (id: string) => Promise<void> })
-      | null;
-    if (el?.setSinkId && speakerId) {
-      void el.setSinkId(speakerId);
-    }
-  }, [speakerId, remoteStream]);
-
-  const copyLink = async () => {
+  const copyLink = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(roomUrl(roomId));
       setCopied(true);
@@ -116,9 +95,9 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
     } catch {
       // ignore
     }
-  };
+  }, [roomId]);
 
-  const handleScreen = async () => {
+  const handleScreen = useCallback(async () => {
     try {
       setScreenError(null);
       if (localScreenSharing) await stopScreenShare();
@@ -130,49 +109,74 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
           : "Screen share failed. The call is still going.",
       );
     }
-  };
+  }, [localScreenSharing, startScreenShare, stopScreenShare]);
+
+  const promote = useCallback((id: VideoTileId) => {
+    setPinned(id);
+  }, []);
+
+  const toggleReactions = useCallback(() => {
+    setReactionOpen((v) => !v);
+  }, []);
+
+  const sendReaction = useCallback(
+    (emoji: string) => {
+      collab.sendCallReaction(emoji);
+    },
+    [collab],
+  );
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <div className="flex-1 relative bg-black overflow-hidden">
-        <video
-          ref={remoteVideoRef}
-          autoPlay
-          playsInline
-          disablePictureInPicture
-          disableRemotePlayback
-          className={cn(
-            "w-full h-full object-cover transition-opacity duration-500",
-            (!connected || showScreen) && "opacity-0",
-          )}
-        />
-        <video
-          ref={remoteScreenRef}
-          autoPlay
-          playsInline
-          disablePictureInPicture
-          className={cn(
-            "absolute inset-0 w-full h-full object-contain bg-black transition-opacity duration-500",
-            showScreen ? "opacity-100" : "opacity-0 pointer-events-none",
-          )}
+    <div className="w-full h-full min-h-0 flex flex-col">
+      <div className="flex-1 relative min-h-0 bg-black overflow-hidden">
+        <VideoTile
+          stream={localStream}
+          spotlight={spotlight === "local"}
+          videoEnabled={videoEnabled}
+          audioEnabled={audioEnabled}
+          muted
+          mirror={facingMode === "user"}
+          fit="cover"
+          label="You"
+          pipCorner="right"
+          pipIndex={0}
+          onPromote={() => promote("local")}
         />
 
-        {connected && !remoteVideoEnabled && !showScreen && (
-          <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center">
-                <CameraOff className="w-12 h-12 text-gray-400" />
-              </div>
-              <span className="text-white/80 text-lg font-medium">
-                Camera Off
-              </span>
-            </div>
-          </div>
+        {connected && (
+          <VideoTile
+            stream={remoteStream}
+            spotlight={spotlight === "remote"}
+            videoEnabled={remoteVideoEnabled}
+            audioEnabled={remoteAudioEnabled}
+            muted={false}
+            fit="cover"
+            label="Guest"
+            sinkId={speakerId}
+            pipCorner="left"
+            pipIndex={0}
+            onPromote={() => promote("remote")}
+          />
         )}
 
-        {connected && !remoteAudioEnabled && (
-          <div className="absolute top-20 left-5 z-20">
-            <div className="bg-red-500/90 backdrop-blur-sm text-white px-3 py-2 rounded-full flex items-center gap-2 shadow-lg">
+        {showScreen && (
+          <VideoTile
+            stream={remoteScreenStream}
+            spotlight={spotlight === "screen"}
+            videoEnabled
+            audioEnabled
+            muted={false}
+            fit="contain"
+            label="Screen"
+            pipCorner="left"
+            pipIndex={spotlight !== "remote" ? 1 : 0}
+            onPromote={() => promote("screen")}
+          />
+        )}
+
+        {connected && !remoteAudioEnabled && spotlight !== "local" && (
+          <div className="absolute top-20 left-5 z-floating">
+            <div className="bg-red-500/90 backdrop-blur-md text-white px-3 py-2 rounded-full flex items-center gap-2 shadow-lg">
               <MicOff className="w-4 h-4" />
               <span className="text-sm font-medium">Muted</span>
             </div>
@@ -180,11 +184,11 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
         )}
 
         {!connected && (
-          <div className="absolute inset-0 flex justify-center bg-linear-to-br from-gray-900 to-black text-white z-10">
-            <div className="flex flex-col gap-2 items-center mt-10">
+          <div className="absolute inset-x-0 top-0 z-tile flex justify-center pointer-events-none">
+            <div className="flex flex-col gap-2 items-center mt-10 pointer-events-auto">
               <div className="flex gap-2 items-center">
                 <Spinner variant="ring" className="w-8 h-8 text-primary" />
-                <p className="text-sm text-white/70">
+                <p className="text-sm text-white/80">
                   {peerLeft
                     ? "They left — waiting for someone to join"
                     : "Waiting for someone to join"}
@@ -193,8 +197,8 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
               <p className="text-xs text-white/50">Room {roomId}</p>
               <button
                 type="button"
-                onClick={copyLink}
-                className="mt-2 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20"
+                onClick={() => void copyLink()}
+                className="mt-1 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 text-white"
               >
                 {copied ? <Check size={12} /> : <Copy size={12} />}
                 Copy link
@@ -203,9 +207,7 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
           </div>
         )}
 
-        {reconnecting && (
-          <CallBanner tone="warn">Reconnecting…</CallBanner>
-        )}
+        {reconnecting && <CallBanner tone="warn">Reconnecting…</CallBanner>}
         {!signalingConnected && connected && (
           <CallBanner tone="danger">Signaling server disconnected</CallBanner>
         )}
@@ -213,7 +215,7 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
           <CallBanner tone="warn">Unstable network</CallBanner>
         )}
         {localScreenSharing && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full text-sm shadow-lg">
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-floating flex items-center gap-2 bg-blue-600/90 backdrop-blur-md text-white px-4 py-2 rounded-full text-sm shadow-lg">
             You are sharing your screen
             <button
               type="button"
@@ -224,14 +226,10 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
             </button>
           </div>
         )}
-        {screenError && (
-          <CallBanner tone="danger">{screenError}</CallBanner>
-        )}
-
-        <ReactionOverlay reactions={collab.callReactions} />
+        {screenError && <CallBanner tone="danger">{screenError}</CallBanner>}
 
         <TopBar>
-          <div className="flex gap-2">
+          <div className="flex gap-2 min-w-0">
             {connected && (
               <ConnectionStats
                 stats={stats}
@@ -240,7 +238,7 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
               />
             )}
             <TopBarButton
-              onClick={copyLink}
+              onClick={() => void copyLink()}
               Icon={copied ? Check : Copy}
               title="Copy room link"
             />
@@ -267,26 +265,6 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
           </div>
         </TopBar>
 
-        {showScreen && (
-          <DraggableVideo
-            videoRef={remoteCameraPipRef}
-            videoEnabled={remoteVideoEnabled}
-            audioEnabled={remoteAudioEnabled}
-            connected
-            mirror={false}
-            corner="left"
-          />
-        )}
-
-        <DraggableVideo
-          videoRef={localVideoRef}
-          videoEnabled={videoEnabled}
-          audioEnabled={audioEnabled}
-          connected={connected}
-          facingMode={facingMode}
-          corner="right"
-        />
-
         <ChatPanel
           open={collab.panelOpen}
           ready={collab.chatReady}
@@ -297,6 +275,8 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
           onSendFile={(file) => void collab.sendFile(file)}
         />
       </div>
+
+      <ReactionOverlay reactions={collab.callReactions} />
 
       <ControlBar
         audioEnabled={audioEnabled}
@@ -313,11 +293,8 @@ export function CallScreen({ roomId, call, onLeave }: CallScreenProps) {
         onToggleChat={() =>
           collab.panelOpen ? collab.closePanel() : collab.openPanel()
         }
-        onToggleReactions={() => setReactionOpen((v) => !v)}
-        onReact={(emoji) => {
-          collab.sendCallReaction(emoji);
-          setReactionOpen(false);
-        }}
+        onToggleReactions={toggleReactions}
+        onReact={sendReaction}
         onLeave={onLeave}
       />
     </div>

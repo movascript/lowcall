@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import { cn } from "../utils/classname";
 
 interface DeviceSelectProps {
@@ -18,24 +19,46 @@ export function DeviceSelect({
   empty = "No devices",
 }: DeviceSelectProps) {
   return (
-    <label className="block text-left" htmlFor={id}>
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={options.length === 0}
-        className={cn(
-          "mt-1 w-full px-3 py-2.5 text-sm rounded-xl border-2 border-border bg-card outline-none focus:border-primary",
-        )}
-      >
-        {options.length === 0 && <option value="">{empty}</option>}
-        {options.map((device, i) => (
-          <option key={device.deviceId || i} value={device.deviceId}>
-            {device.label || `${label} ${i + 1}`}
-          </option>
-        ))}
-      </select>
-    </label>
+    <fieldset className="text-left">
+      <legend className="text-xs font-medium text-muted-foreground mb-1.5">
+        {label}
+      </legend>
+      {options.length === 0 ? (
+        <p className="text-sm text-muted-foreground px-3 py-2">{empty}</p>
+      ) : (
+        <div
+          id={id}
+          role="radiogroup"
+          aria-label={label}
+          className="flex flex-col gap-1.5 max-h-36 overflow-y-auto"
+        >
+          {options.map((device, i) => {
+            const selected = device.deviceId === value;
+            return (
+              <button
+                key={device.deviceId || i}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => onChange(device.deviceId)}
+                className={cn(
+                  "flex items-center justify-between gap-2 w-full text-left px-3 py-2.5 rounded-2xl text-sm transition-all border backdrop-blur-md",
+                  selected
+                    ? "bg-primary/25 border-primary/70 text-foreground shadow-sm"
+                    : "bg-white/50 border-transparent hover:bg-white/80 text-foreground/80",
+                )}
+              >
+                <span className="truncate">
+                  {device.label || `${label} ${i + 1}`}
+                </span>
+                {selected && (
+                  <Check className="size-4 shrink-0 text-foreground" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </fieldset>
   );
 }

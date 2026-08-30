@@ -64,7 +64,7 @@ export function Lobby({
 
   return (
     <div className="flex items-center justify-center h-full p-4 sm:p-6 overflow-y-auto">
-      <div className="bg-card rounded-3xl p-5 sm:p-6 shadow-2xl max-w-lg w-full animate-in fade-in-50">
+      <div className="bg-card/90 backdrop-blur-xl rounded-3xl p-5 sm:p-6 shadow-2xl max-w-lg w-full animate-in fade-in-50 border border-white/40">
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-xs text-muted-foreground">Ready to join</p>
@@ -81,7 +81,7 @@ export function Lobby({
           </button>
         </div>
 
-        <div className="relative aspect-video rounded-2xl overflow-hidden bg-black mb-4">
+        <div className="relative aspect-video rounded-3xl overflow-hidden bg-black mb-4 ring-1 ring-black/5">
           <video
             ref={videoRef}
             autoPlay
@@ -166,7 +166,7 @@ export function Lobby({
           type="button"
           onClick={onJoin}
           disabled={joining || Boolean(mediaError)}
-          className="flex justify-center items-center gap-2 w-full py-3.5 text-base font-semibold text-primary-foreground bg-linear-to-r from-primary to-accent rounded-xl disabled:opacity-50"
+          className="flex justify-center items-center gap-2 w-full py-3.5 text-base font-semibold text-primary-foreground bg-linear-to-r from-primary to-accent rounded-2xl disabled:opacity-50"
         >
           {joining ? (
             <Spinner variant="circle" className="w-5 h-5" />

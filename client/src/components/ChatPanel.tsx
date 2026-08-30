@@ -5,6 +5,8 @@ import {
   X,
   Download,
   MessageCircle,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import type { ChatMessage } from "../types";
 import { REACTION_EMOJIS, CHAT_MAX_LENGTH } from "../utils/constants";
@@ -32,13 +34,14 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const [draft, setDraft] = useState("");
   const [reactingTo, setReactingTo] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [messages, open]);
+  }, [messages, open, expanded]);
 
   if (!open) return null;
 
@@ -47,37 +50,71 @@ export function ChatPanel({
     setDraft("");
   };
 
+  const visible = expanded ? messages : messages.slice(-8);
+  const hud = !expanded;
+
   return (
     <aside
-      className="absolute inset-y-0 right-0 z-40 w-full sm:w-96 flex flex-col bg-black/85 backdrop-blur-xl border-l border-white/10 animate-in slide-in-from-right-10"
+      className={cn(
+        "z-modal flex flex-col pointer-events-auto",
+        expanded
+          ? "absolute inset-0 bg-black/75 backdrop-blur-xl"
+          : "absolute inset-x-0 bottom-0 h-[33%] bg-black/55 backdrop-blur-xl border-t border-white/10 sm:inset-auto sm:right-4 sm:bottom-4 sm:h-auto sm:w-80 sm:max-h-[46%] sm:bg-transparent sm:backdrop-blur-none sm:border-0 sm:pointer-events-none",
+      )}
       aria-label="Chat"
     >
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+      <div
+        className={cn(
+          "flex items-center justify-between px-3 py-2 sm:pointer-events-auto",
+          hud &&
+            "sm:px-0 sm:pb-2 sm:bg-transparent",
+        )}
+      >
         <div className="flex items-center gap-2 text-white">
-          <MessageCircle size={18} />
-          <h2 className="font-semibold">Chat</h2>
+          <MessageCircle size={16} />
+          <h2 className="font-semibold text-sm">Chat</h2>
         </div>
-        <button
-          type="button"
-          aria-label="Close chat"
-          onClick={onClose}
-          className="text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10"
-        >
-          <X size={18} />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            aria-label={expanded ? "Minimize chat" : "Expand chat"}
+            onClick={() => setExpanded((v) => !v)}
+            className="text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10"
+          >
+            {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+          <button
+            type="button"
+            aria-label="Close chat"
+            onClick={() => {
+              setExpanded(false);
+              onClose();
+            }}
+            className="text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10"
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
-      <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
+      <div
+        ref={listRef}
+        className={cn(
+          "flex-1 overflow-y-auto px-3 space-y-2 sm:pointer-events-auto",
+          hud && "sm:px-0 sm:flex sm:flex-col sm:justify-end",
+        )}
+      >
         {messages.length === 0 && (
-          <p className="text-center text-sm text-white/50 mt-8">
-            Messages stay on this call. Nothing is stored on the server.
+          <p className="text-center text-xs text-white/50 py-4">
+            Messages stay on this call.
           </p>
         )}
-        {messages.map((msg) => (
+        {visible.map((msg) => (
           <ChatBubble
             key={msg.id}
             message={msg}
             reacting={reactingTo === msg.id}
+            glass={hud}
             onToggleReact={() =>
               setReactingTo((id) => (id === msg.id ? null : msg.id))
             }
@@ -90,7 +127,10 @@ export function ChatPanel({
       </div>
 
       <div
-        className="p-3 border-t border-white/10 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        className={cn(
+          "p-3 pt-2 sm:pointer-events-auto",
+          hud && "sm:p-0 sm:pt-2",
+        )}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
@@ -99,11 +139,17 @@ export function ChatPanel({
         }}
       >
         {!ready && (
-          <p className="text-xs text-amber-300 mb-2">
+          <p className="text-[11px] text-amber-300 mb-1.5">
             Chat unavailable — video is still connected
           </p>
         )}
-        <div className="flex items-end gap-2">
+        <div
+          className={cn(
+            "flex items-end gap-1.5",
+            hud &&
+              "sm:bg-black/50 sm:backdrop-blur-md sm:rounded-2xl sm:p-1.5 sm:border sm:border-white/10",
+          )}
+        >
           <input
             ref={fileRef}
             type="file"
@@ -119,15 +165,15 @@ export function ChatPanel({
             aria-label="Attach file"
             disabled={!ready}
             onClick={() => fileRef.current?.click()}
-            className="shrink-0 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center disabled:opacity-40"
+            className="shrink-0 w-9 h-9 rounded-full bg-white/10 text-white flex items-center justify-center disabled:opacity-40"
           >
-            <Paperclip size={18} />
+            <Paperclip size={16} />
           </button>
           <textarea
             value={draft}
             disabled={!ready}
             maxLength={CHAT_MAX_LENGTH}
-            placeholder={ready ? "Send a message" : "Chat unavailable"}
+            placeholder={ready ? "Message" : "Chat unavailable"}
             rows={1}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -136,16 +182,16 @@ export function ChatPanel({
                 submit();
               }
             }}
-            className="flex-1 resize-none rounded-2xl bg-white/10 text-white px-3 py-2 text-sm outline-none placeholder:text-white/40 max-h-28"
+            className="flex-1 resize-none rounded-2xl bg-white/10 sm:bg-transparent text-white px-3 py-2 text-sm outline-none placeholder:text-white/40 max-h-24"
           />
           <button
             type="button"
             aria-label="Send message"
             disabled={!ready || !draft.trim()}
             onClick={submit}
-            className="shrink-0 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40"
+            className="shrink-0 w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40"
           >
-            <Send size={18} />
+            <Send size={16} />
           </button>
         </div>
       </div>
@@ -156,11 +202,13 @@ export function ChatPanel({
 function ChatBubble({
   message,
   reacting,
+  glass,
   onToggleReact,
   onReact,
 }: {
   message: ChatMessage;
   reacting: boolean;
+  glass: boolean;
   onToggleReact: () => void;
   onReact: (emoji: string) => void;
 }) {
@@ -171,19 +219,30 @@ function ChatBubble({
   });
 
   return (
-    <div className={cn("flex flex-col max-w-[85%]", mine ? "ml-auto items-end" : "mr-auto items-start")}>
+    <div
+      className={cn(
+        "flex flex-col max-w-[90%]",
+        mine ? "ml-auto items-end" : "mr-auto items-start",
+      )}
+    >
       <button
         type="button"
         onClick={onToggleReact}
         className={cn(
           "text-left rounded-2xl px-3 py-2 text-sm text-white",
-          mine ? "bg-primary/90 text-primary-foreground" : "bg-white/15",
+          glass
+            ? mine
+              ? "bg-primary/70 backdrop-blur-md border border-white/10 text-primary-foreground"
+              : "bg-white/15 backdrop-blur-md border border-white/10"
+            : mine
+              ? "bg-primary/90 text-primary-foreground"
+              : "bg-white/15",
         )}
       >
         {message.kind === "text" ? (
           <p className="whitespace-pre-wrap break-words">{message.text}</p>
         ) : (
-          <div className="min-w-40">
+          <div className="min-w-36">
             <p className="font-medium truncate">{message.name}</p>
             <p className="text-xs opacity-80">
               {formatBytes(message.size)}
@@ -225,18 +284,18 @@ function ChatBubble({
               type="button"
               onClick={() => onReact(r.emoji)}
               className={cn(
-                "text-xs px-1.5 py-0.5 rounded-full bg-white/10",
+                "text-xs px-1.5 py-0.5 rounded-full bg-white/10 backdrop-blur-md",
                 r.local && "ring-1 ring-primary",
               )}
             >
               {r.emoji}
-              {(Number(r.local) + Number(r.remote)) > 1 ? " 2" : ""}
+              {Number(r.local) + Number(r.remote) > 1 ? " 2" : ""}
             </button>
           ))}
         </div>
       )}
       {reacting && (
-        <div className="flex gap-1 mt-1 px-1 py-1 rounded-full bg-black/80 border border-white/10">
+        <div className="z-tooltip flex gap-1 mt-1 px-1 py-1 rounded-full bg-black/80 backdrop-blur-md border border-white/10">
           {REACTION_EMOJIS.map((emoji) => (
             <button
               key={emoji}

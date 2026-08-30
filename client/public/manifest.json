@@ -1,0 +1,19 @@
+{
+  "name": "Lowcall",
+  "short_name": "Lowcall",
+  "description": "Simple, fast, secure video calls",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1a1a1a",
+  "theme_color": "#f3ad66",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -16,7 +16,7 @@ const LandingPage = ({
 }: LandingPageProps) => {
   return (
     <div className="flex items-center justify-center h-full p-6">
-      <div className="bg-card animate-in fade-in-50 slide-in-from-bottom-5 rounded-4xl p-6 shadow-2xl max-w-sm w-full">
+      <div className="bg-card/90 backdrop-blur-xl animate-in fade-in-50 slide-in-from-bottom-5 rounded-3xl p-6 shadow-2xl max-w-sm w-full border border-white/40">
         <div className="text-center mb-8">
           <div className="flex items-center gap-4 justify-center p-1 my-2">
             <img

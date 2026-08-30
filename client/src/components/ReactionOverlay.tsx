@@ -2,14 +2,14 @@ import type { CallReaction } from "../types";
 
 export function ReactionOverlay({ reactions }: { reactions: CallReaction[] }) {
   return (
-    <div className="pointer-events-none absolute inset-0 z-[25] overflow-hidden">
+    <div className="pointer-events-none fixed inset-0 z-reaction overflow-hidden">
       {reactions.map((reaction, i) => (
         <span
           key={reaction.id}
-          className="absolute text-4xl sm:text-5xl animate-in fade-in slide-in-from-bottom-10 duration-700"
+          className="absolute text-4xl sm:text-5xl reaction-rise drop-shadow-lg"
           style={{
-            left: `${20 + ((i * 13) % 60)}%`,
-            bottom: `${18 + ((i * 11) % 40)}%`,
+            left: `${18 + ((i * 17) % 64)}%`,
+            bottom: "5.5rem",
           }}
         >
           {reaction.emoji}

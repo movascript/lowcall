@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { ControlButton } from "./ControlButton";
 import {
   Mic,
@@ -48,10 +49,27 @@ const ControlBar = ({
   onReact,
   onLeave,
 }: ControlBarProps) => {
+  const trayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!reactionOpen) return;
+    const onPointer = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-reaction-toggle]")) return;
+      if (trayRef.current?.contains(target)) return;
+      onToggleReactions();
+    };
+    document.addEventListener("mousedown", onPointer);
+    return () => document.removeEventListener("mousedown", onPointer);
+  }, [reactionOpen, onToggleReactions]);
+
   return (
-    <div className="relative animate-in fade-in slide-in-from-bottom-10 flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-6 py-4 sm:py-5 bg-black/90 backdrop-blur-xl border-t border-white/10 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+    <div className="relative z-floating flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-6 py-3 sm:py-4 bg-black/70 backdrop-blur-xl border-t border-white/10 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       {reactionOpen && (
-        <div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 flex gap-1 px-3 py-2 rounded-full bg-black/90 border border-white/10 shadow-2xl">
+        <div
+          ref={trayRef}
+          className="absolute z-tooltip bottom-[calc(100%+10px)] left-1/2 -translate-x-1/2 flex gap-1 px-3 py-2 rounded-full bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl"
+        >
           {REACTION_EMOJIS.map((emoji) => (
             <button
               key={emoji}
@@ -91,13 +109,15 @@ const ControlBar = ({
         variant={localScreenSharing ? "primary" : "default"}
         label={localScreenSharing ? "Stop sharing screen" : "Share screen"}
       />
-      <ControlButton
-        icon={Smile}
-        onClick={onToggleReactions}
-        active={!reactionOpen}
-        variant={reactionOpen ? "primary" : "default"}
-        label="Emoji reactions"
-      />
+      <span data-reaction-toggle>
+        <ControlButton
+          icon={Smile}
+          onClick={onToggleReactions}
+          active={!reactionOpen}
+          variant={reactionOpen ? "primary" : "default"}
+          label="Emoji reactions"
+        />
+      </span>
       <ControlButton
         icon={MessageCircle}
         onClick={onToggleChat}

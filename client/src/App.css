@@ -41,6 +41,12 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --z-index-video: 0;
+  --z-index-tile: 10;
+  --z-index-floating: 30;
+  --z-index-modal: 40;
+  --z-index-reaction: 50;
+  --z-index-tooltip: 60;
 }
 
 :root {
@@ -116,6 +122,12 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body,
+  #root {
+    height: 100dvh;
+    overflow: hidden;
+  }
   button,
   video {
     user-select: none;
@@ -127,10 +139,28 @@
       "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
       sans-serif;
 
-    /* disables pull-to-refresh on some browsers */
     overscroll-behavior-y: contain;
 
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+}
+
+@keyframes reaction-rise {
+  0% {
+    transform: translateY(0) scale(0.7);
+    opacity: 0;
+  }
+  14% {
+    transform: translateY(-6dvh) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-78dvh) scale(1.2);
+    opacity: 0;
+  }
+}
+
+.reaction-rise {
+  animation: reaction-rise 2.2s ease-out forwards;
 }

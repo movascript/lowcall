@@ -66,7 +66,7 @@ export function ConnectionStats({
       ) : (
         <div
           ref={ref}
-          className="absolute z-30 bg-black/50 backdrop-blur-md border border-white/10 rounded-xl p-2 w-full sm:w-80 shadow-2xl animate-in fade-in slide-in-from-top-4"
+          className="absolute left-0 top-12 z-tooltip w-[min(calc(100vw-2rem),20rem)] max-h-[min(70vh,32rem)] overflow-y-auto overflow-x-hidden bg-black/70 backdrop-blur-md border border-white/10 rounded-2xl p-3 shadow-2xl animate-in fade-in slide-in-from-top-4"
         >
           <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-3">
             <span className="text-white px-2 font-medium text-sm flex items-center gap-2">

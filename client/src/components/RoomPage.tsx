@@ -59,7 +59,7 @@ export function RoomPage() {
   };
 
   return (
-    <>
+    <div className="h-full min-h-0">
       {showCall ? (
         <CallScreen roomId={roomId} call={call} onLeave={handleLeave} />
       ) : (
@@ -94,6 +94,6 @@ export function RoomPage() {
           }}
         />
       )}
-    </>
+    </div>
   );
 }

@@ -15,7 +15,7 @@ function Home() {
   };
 
   return (
-    <div className="w-screen h-screen bg-linear-to-br from-primary via-primary to-accent overflow-hidden">
+    <div className="w-full h-dvh bg-linear-to-br from-primary via-primary to-accent overflow-hidden">
       <LandingPage
         roomId={roomId}
         setRoomId={setRoomId}
@@ -28,7 +28,7 @@ function Home() {
 
 function App() {
   return (
-    <div className="w-screen h-screen bg-linear-to-br from-primary via-primary to-accent overflow-hidden">
+    <div className="w-full h-dvh bg-linear-to-br from-primary via-primary to-accent overflow-hidden">
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/:roomId" element={<RoomPage />} />
